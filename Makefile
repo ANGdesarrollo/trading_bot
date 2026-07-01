@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps build operator-local reconciler-local api-local frontend test
+.PHONY: help up down logs ps build operator-local reconciler-local api-local frontend test postgres api frontend-detached
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -8,6 +8,15 @@ help: ## Show this help
 
 up: ## Build and start all services (postgres, ingestion, operator, reconciler, api)
 	docker compose up -d --build
+
+postgres: ## Start only the postgres service (detached)
+	docker compose up -d postgres
+
+api: ## Start only the api service in docker (detached, starts postgres if needed)
+	docker compose up -d --build api
+
+frontend-detached: ## Start the candle viewer dev server in the background (logs to frontend/dev.log)
+	cd frontend && nohup pnpm dev > dev.log 2>&1 &
 
 down: ## Stop and remove all services
 	docker compose down
