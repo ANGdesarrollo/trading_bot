@@ -19,6 +19,7 @@ from application.trading_cycle import RunTradingCycleUseCase
 from domain.adapters.fade_strategy import FadeStrategy
 from domain.ports.trade_journal_port import TradeJournalPort
 from infrastructure.capital.broker import CapitalBrokerAdapter
+from infrastructure.capital.cached_session import CachedSession
 from infrastructure.capital.clock import SystemClock
 from infrastructure.capital.session import CapitalSession
 from infrastructure.postgres.connection import connect
@@ -46,15 +47,20 @@ def seconds_until_next_boundary(now: datetime, period_minutes: int) -> float:
 
 
 def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None):
-    session = CapitalSession(
+    capital_session = CapitalSession(
         http=http,
         base_url=config.base_url,
         api_key=config.api_key,
         identifier=config.identifier,
         password=config.password,
     )
+    session = CachedSession(
+        inner=capital_session,
+        clock=clock,
+        refresh_ttl_seconds=config.session_refresh_ttl_seconds,
+    )
     broker = CapitalBrokerAdapter(
-        session=session,
+        session=capital_session,
         http=http,
         base_url=config.base_url,
         epics=config.epics,
@@ -112,4 +118,5 @@ if __name__ == "__main__":
     http = requests.Session()
     clock = SystemClock()
     use_cases, session = build_use_cases(config, http, clock)
+    session.authenticate()
     run_forever(config, use_cases, session, clock)

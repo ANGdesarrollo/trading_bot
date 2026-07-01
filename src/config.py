@@ -50,6 +50,8 @@ class Config:
     poll_minutes: int
     freshness_max_retries: int
     freshness_retry_seconds: float
+    reconciler_interval_seconds: int
+    session_refresh_ttl_seconds: float
     database_url: str
 
     @property
@@ -103,6 +105,8 @@ def load_config() -> Config:
     poll_minutes = int(env.get("POLL_MINUTES", "15"))
     freshness_max_retries = int(env.get("FRESHNESS_MAX_RETRIES", "3"))
     freshness_retry_seconds = float(env.get("FRESHNESS_RETRY_SECONDS", "2.0"))
+    reconciler_interval_seconds = int(env.get("RECONCILER_INTERVAL_SECONDS", "300"))
+    session_refresh_ttl_seconds = float(env.get("SESSION_REFRESH_TTL_SECONDS", "540"))
 
     missing_shared = [name for name, val in [
         ("CAPITAL_API_KEY", api_key),
@@ -130,5 +134,7 @@ def load_config() -> Config:
         poll_minutes=poll_minutes,
         freshness_max_retries=freshness_max_retries,
         freshness_retry_seconds=freshness_retry_seconds,
+        reconciler_interval_seconds=reconciler_interval_seconds,
+        session_refresh_ttl_seconds=session_refresh_ttl_seconds,
         database_url=database_url,
     )

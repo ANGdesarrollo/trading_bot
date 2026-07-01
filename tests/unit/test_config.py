@@ -20,6 +20,7 @@ def _load_config(env: dict[str, str]):
             "MODE", "CAPITAL_API_KEY", "IDENTIFIER", "PASSWORD", "DATABASE_URL",
             "TIMEFRAME", "WARMUP", "CANDLE_SETTLE_SECONDS", "POLL_MINUTES",
             "FRESHNESS_MAX_RETRIES", "FRESHNESS_RETRY_SECONDS",
+            "RECONCILER_INTERVAL_SECONDS", "SESSION_REFRESH_TTL_SECONDS",
             "I_UNDERSTAND_THIS_IS_REAL_MONEY",
         )
     }
@@ -113,6 +114,26 @@ def test_freshness_fields_env_override():
     })
     assert config.freshness_max_retries == 5
     assert config.freshness_retry_seconds == 1.5
+
+
+def test_reconciler_interval_defaults_to_300():
+    config = _load_config(_REQUIRED_ENV)
+    assert config.reconciler_interval_seconds == 300
+
+
+def test_reconciler_interval_env_override():
+    config = _load_config({**_REQUIRED_ENV, "RECONCILER_INTERVAL_SECONDS": "120"})
+    assert config.reconciler_interval_seconds == 120
+
+
+def test_session_refresh_ttl_defaults_to_540():
+    config = _load_config(_REQUIRED_ENV)
+    assert config.session_refresh_ttl_seconds == 540.0
+
+
+def test_session_refresh_ttl_env_override():
+    config = _load_config({**_REQUIRED_ENV, "SESSION_REFRESH_TTL_SECONDS": "480"})
+    assert config.session_refresh_ttl_seconds == 480.0
 
 
 def test_database_url_missing_raises_system_exit(monkeypatch):

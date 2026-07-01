@@ -40,12 +40,15 @@ def test_reconciler_loop_catches_exception_and_continues():
             slept.append(seconds)
 
     with pytest.raises(_StopTest):
-        run_reconciler_forever(_FailOnce(), _FakeSession(), _FakeClock(), logging.getLogger("test"))
+        run_reconciler_forever(
+            _FailOnce(), _FakeSession(), _FakeClock(), logging.getLogger("test"),
+            interval_seconds=300,
+        )
 
     assert call_count == 2
 
 
-def test_reconciler_loop_sleeps_before_each_cycle():
+def test_reconciler_loop_sleeps_configured_interval_before_each_cycle():
     iterations = 0
 
     class _CountingUseCase:
@@ -62,10 +65,48 @@ def test_reconciler_loop_sleeps_before_each_cycle():
             slept.append(seconds)
 
     with pytest.raises(_StopTest):
-        run_reconciler_forever(_CountingUseCase(), _FakeSession(), _FakeClock(), logging.getLogger("test"))
+        run_reconciler_forever(
+            _CountingUseCase(),
+            _FakeSession(),
+            _FakeClock(),
+            logging.getLogger("test"),
+            interval_seconds=300,
+        )
 
-    assert all(s == 60 for s in slept)
-    assert len(slept) == 2
+    assert all(s == 300 for s in slept)
+    assert len(slept) == 1
+
+
+def test_reconciler_authenticates_eagerly_before_first_sleep():
+    events: list[str] = []
+    cycles = 0
+
+    class _TrackingSession:
+        def authenticate(self) -> None:
+            events.append("auth")
+
+    class _TrackingUseCase:
+        def execute(self) -> None:
+            nonlocal cycles
+            events.append("execute")
+            cycles += 1
+            if cycles >= 1:
+                raise _StopTest("stop")
+
+    class _FakeClock:
+        def sleep(self, seconds: float) -> None:
+            events.append("sleep")
+
+    with pytest.raises(_StopTest):
+        run_reconciler_forever(
+            _TrackingUseCase(),
+            _TrackingSession(),
+            _FakeClock(),
+            logging.getLogger("test"),
+            interval_seconds=300,
+        )
+
+    assert events[0] == "auth"
 
 
 def test_reconciler_authenticates_before_each_execute():
@@ -89,7 +130,10 @@ def test_reconciler_authenticates_before_each_execute():
             pass
 
     with pytest.raises(_StopTest):
-        run_reconciler_forever(_TrackingUseCase(), _TrackingSession(), _FakeClock(), logging.getLogger("test"))
+        run_reconciler_forever(
+            _TrackingUseCase(), _TrackingSession(), _FakeClock(), logging.getLogger("test"),
+            interval_seconds=300,
+        )
 
     assert events == ["auth", "execute", "auth", "execute"]
 
@@ -113,6 +157,7 @@ def test_reconciler_skips_execute_when_authenticate_raises():
             _FakeSession(raise_on_call=1),
             _FakeClock(),
             logging.getLogger("test"),
+            interval_seconds=300,
         )
 
     assert execute_calls == 1

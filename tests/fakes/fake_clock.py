@@ -16,3 +16,6 @@ class FakeClock(ClockPort):
     def sleep(self, seconds: float) -> None:
         self.sleep_calls.append(seconds)
         self._time = self._time + timedelta(seconds=seconds)
+
+    def advance(self, seconds: float) -> None:
+        self._time = self._time + timedelta(seconds=seconds)

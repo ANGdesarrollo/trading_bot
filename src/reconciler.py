@@ -21,14 +21,15 @@ def run_reconciler_forever(
     session: _HasAuthenticate,
     clock: _HasSleep,
     logger: logging.Logger,
+    interval_seconds: float,
 ) -> None:
     while True:
-        clock.sleep(60)
         try:
             session.authenticate()
             use_case.execute()
         except Exception:
             logger.exception("reconciler cycle failed; retrying next boundary")
+        clock.sleep(interval_seconds)
 
 
 if __name__ == "__main__":
@@ -39,6 +40,7 @@ if __name__ == "__main__":
 
     load_dotenv()
     from application.reconcile_closed_trades import ReconcileClosedTradesUseCase
+    from infrastructure.capital.cached_session import CachedSession
     from infrastructure.capital.clock import SystemClock
     from infrastructure.capital.history_adapter import CapitalTradeHistory
     from infrastructure.capital.session import CapitalSession
@@ -57,17 +59,26 @@ if __name__ == "__main__":
     run_migrations(_conn)
 
     _http = requests.Session()
-    _session = CapitalSession(
+    _clock = SystemClock()
+    _capital_session = CapitalSession(
         http=_http,
         base_url=_config.base_url,
         api_key=_config.api_key,
         identifier=_config.identifier,
         password=_config.password,
     )
+    _session = CachedSession(
+        inner=_capital_session,
+        clock=_clock,
+        refresh_ttl_seconds=_config.session_refresh_ttl_seconds,
+    )
+    _session.authenticate()
 
     _journal = PostgresTradeJournal(_conn)
-    _history = CapitalTradeHistory(session=_session, http=_http, base_url=_config.base_url)
+    _history = CapitalTradeHistory(session=_capital_session, http=_http, base_url=_config.base_url)
     _use_case = ReconcileClosedTradesUseCase(_journal, _history)
-    _clock = SystemClock()
 
-    run_reconciler_forever(_use_case, _session, _clock, _logger)
+    run_reconciler_forever(
+        _use_case, _session, _clock, _logger,
+        interval_seconds=_config.reconciler_interval_seconds,
+    )
