@@ -27,6 +27,7 @@ class RunTradingCycleUseCase:
         candle_store: CandleStorePort,
         resolution: str,
         journal: TradeJournalPort,
+        provider: str = "capital",
     ) -> None:
         self._broker = broker
         self._strategy = strategy
@@ -38,6 +39,7 @@ class RunTradingCycleUseCase:
         self._candle_store = candle_store
         self._resolution = resolution
         self._journal = journal
+        self._provider = provider
 
     def execute(self) -> OrderResult | None:
         if self._broker.has_open_position(self._symbol):
@@ -45,7 +47,7 @@ class RunTradingCycleUseCase:
             return None
 
         candles = self._candle_store.recent_candles(
-            symbol=self._symbol, resolution=self._resolution,
+            provider=self._provider, symbol=self._symbol, resolution=self._resolution,
             count=self._strategy.required_candles)
 
         if len(candles) < self._strategy.required_candles:
@@ -90,6 +92,7 @@ class RunTradingCycleUseCase:
         decision_candle_ts: datetime,
     ) -> JournalEntry:
         return JournalEntry(
+            provider=self._provider,
             deal_id=result.order_id,
             symbol=self._symbol,
             direction=signal.direction.name,

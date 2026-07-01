@@ -72,6 +72,7 @@ def _make_use_case(
     clock: FakeClock | None = None,
     poll_minutes: int = 15,
     journal=None,
+    provider: str = "capital",
 ) -> RunTradingCycleUseCase:
     if clock is None:
         clock = FakeClock(_CLOCK_SEED)
@@ -88,6 +89,7 @@ def _make_use_case(
         candle_store=candle_store,
         resolution="MINUTE_15",
         journal=journal,
+        provider=provider,
     )
 
 
@@ -215,3 +217,29 @@ def test_journal_failure_does_not_crash_cycle():
     result = uc.execute()
 
     assert result is not None
+
+
+def test_configured_provider_flows_to_recent_candles():
+    broker = FakeBroker(has_open=False)
+    store = FakeCandleStore(candles=[_stale_candle()] * _REQUIRED)
+    uc = _make_use_case(broker, _NoSignalStrategy(), store, provider="ic_markets")
+
+    uc.execute()
+
+    provider, _sym, _res, _count = store.recent_candles_calls[0]
+    assert provider == "ic_markets"
+
+
+def test_configured_provider_stamped_on_journal_entry():
+    signal = _make_signal()
+    order = OrderResult(order_id="D1", status="OPEN", filled_price=1.1001)
+    broker = FakeBroker(has_open=False, order_result=order)
+    store = FakeCandleStore(candles=[_fresh_candle()] * _REQUIRED)
+    journal = FakeJournalPort()
+    uc = _make_use_case(
+        broker, _FixedSignalStrategy(signal), store, journal=journal, provider="ic_markets"
+    )
+
+    uc.execute()
+
+    assert journal.entry_calls[0].provider == "ic_markets"
