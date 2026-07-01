@@ -32,6 +32,22 @@ services:
       retries: 12
       start_period: 60s
 
+  api:
+    build: .
+    command: ["python", "src/api.py"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+      API_HOST: 0.0.0.0
+      API_PORT: "8001"
+      CORS_ALLOW_ORIGINS: http://localhost:5173
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   operator:
     build: .
     command: ["python", "src/__main__.py"]
