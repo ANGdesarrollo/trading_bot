@@ -29,7 +29,7 @@ SELECT candle_start,
        open_bid, high_bid, low_bid, close_bid,
        open_ask, high_ask, low_ask, close_ask
 FROM candles
-WHERE epic = %s AND resolution = %s
+WHERE provider = %s AND epic = %s AND resolution = %s
 ORDER BY candle_start DESC
 LIMIT %s
 """
@@ -37,7 +37,7 @@ LIMIT %s
 _SELECT_LAST_START = """
 SELECT candle_start
 FROM candles
-WHERE epic = %s AND resolution = %s
+WHERE provider = %s AND epic = %s AND resolution = %s
 ORDER BY candle_start DESC
 LIMIT 1
 """
@@ -67,15 +67,19 @@ class PostgresCandleStore(CandleStorePort):
             ))
         self._conn.commit()
 
-    def recent_candles(self, symbol: str, resolution: str, count: int) -> Sequence[Candle]:
+    def recent_candles(
+        self, provider: str = "capital", *, symbol: str, resolution: str, count: int
+    ) -> Sequence[Candle]:
         with self._conn.cursor() as cur:
-            cur.execute(_SELECT_RECENT, (symbol, resolution, count))
+            cur.execute(_SELECT_RECENT, (provider, symbol, resolution, count))
             rows = cur.fetchall()
         return [_row_to_candle(row) for row in reversed(rows)]
 
-    def last_candle_start(self, symbol: str, resolution: str) -> datetime | None:
+    def last_candle_start(
+        self, provider: str = "capital", *, symbol: str, resolution: str
+    ) -> datetime | None:
         with self._conn.cursor() as cur:
-            cur.execute(_SELECT_LAST_START, (symbol, resolution))
+            cur.execute(_SELECT_LAST_START, (provider, symbol, resolution))
             row = cur.fetchone()
         if row is None:
             return None

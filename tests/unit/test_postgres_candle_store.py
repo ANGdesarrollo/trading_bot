@@ -91,7 +91,7 @@ def test_recent_candles_mid_derivation_from_decimal_rows():
     ]
     conn = _FakeConn(rows=rows)
     store = PostgresCandleStore(conn)
-    candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
+    candles = store.recent_candles(symbol="EURUSD", resolution="MINUTE_15", count=3)
     assert len(candles) == 3
     assert candles[0].open == pytest.approx(1.10)
     assert candles[0].high == pytest.approx(1.12)
@@ -106,7 +106,7 @@ def test_decimal_to_float_cast_probe():
     rows = [_decimal_row(_T1, open_bid="1.0", open_ask="1.2")]
     conn = _FakeConn(rows=rows)
     store = PostgresCandleStore(conn)
-    candles = store.recent_candles("EURUSD", "MINUTE_15", 1)
+    candles = store.recent_candles(symbol="EURUSD", resolution="MINUTE_15", count=1)
     assert len(candles) == 1
     assert type(candles[0].open) is float
     assert type(candles[0].high) is float
@@ -124,7 +124,7 @@ def test_recent_candles_ordering_oldest_first():
     ]
     conn = _FakeConn(rows=rows)
     store = PostgresCandleStore(conn)
-    candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
+    candles = store.recent_candles(symbol="EURUSD", resolution="MINUTE_15", count=3)
     timestamps = [c.timestamp for c in candles]
     assert timestamps == sorted(timestamps)
 
@@ -134,11 +134,23 @@ def test_recent_candles_filters_by_resolution():
 
     conn = _FakeConn(rows=[_decimal_row(_T1, open_bid=1.0, open_ask=1.2)])
     store = PostgresCandleStore(conn)
-    store.recent_candles("EURUSD", "HOUR", 3)
+    store.recent_candles(symbol="EURUSD", resolution="HOUR", count=3)
 
     sql, params = conn._cursor.executed[0]
     assert "resolution = %s" in sql
-    assert params == ("EURUSD", "HOUR", 3)
+    assert params == ("capital", "EURUSD", "HOUR", 3)
+
+
+def test_recent_candles_filters_by_provider():
+    from infrastructure.postgres.candle_store import PostgresCandleStore
+
+    conn = _FakeConn(rows=[_decimal_row(_T1, open_bid=1.0, open_ask=1.2)])
+    store = PostgresCandleStore(conn)
+    store.recent_candles("ic_markets", symbol="EURUSD", resolution="HOUR", count=3)
+
+    sql, params = conn._cursor.executed[0]
+    assert "provider = %s" in sql
+    assert params[0] == "ic_markets"
 
 
 def test_last_candle_start_returns_none_when_no_rows():
@@ -158,5 +170,5 @@ def test_last_candle_start_returns_none_when_no_rows():
         def commit(self): pass
 
     store2 = PostgresCandleStore(_NoneConn())
-    result = store2.last_candle_start("EURUSD", "MINUTE_15")
+    result = store2.last_candle_start(symbol="EURUSD", resolution="MINUTE_15")
     assert result is None
