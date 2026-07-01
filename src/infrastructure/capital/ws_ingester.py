@@ -107,7 +107,7 @@ class CapitalWsIngester:
 
     def _backfill_or_gap_fill(self) -> None:
         for epic in self._epics:
-            last = self._store.last_candle_start(epic, self._resolution)
+            last = self._store.last_candle_start(symbol=epic, resolution=self._resolution)
             if last is None:
                 rows = self._history.fetch_history(
                     epic, self._resolution, self._required_candles, None

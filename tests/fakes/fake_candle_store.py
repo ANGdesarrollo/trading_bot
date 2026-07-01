@@ -17,14 +17,20 @@ class FakeCandleStore(CandleStorePort):
     ) -> None:
         self._candles = list(candles or [])
         self._last_start = last_start
-        self.recent_candles_calls: list[tuple[str, str, int]] = []
+        self.recent_candles_calls: list[tuple[str, str, str, int]] = []
+        self.last_candle_start_calls: list[tuple[str, str, str]] = []
         self.upsert_calls: list[CandleRow] = []
 
-    def recent_candles(self, symbol: str, resolution: str, count: int) -> Sequence[Candle]:
-        self.recent_candles_calls.append((symbol, resolution, count))
+    def recent_candles(
+        self, provider: str = "capital", *, symbol: str, resolution: str, count: int
+    ) -> Sequence[Candle]:
+        self.recent_candles_calls.append((provider, symbol, resolution, count))
         return self._candles
 
-    def last_candle_start(self, symbol: str, resolution: str) -> datetime | None:
+    def last_candle_start(
+        self, provider: str = "capital", *, symbol: str, resolution: str
+    ) -> datetime | None:
+        self.last_candle_start_calls.append((provider, symbol, resolution))
         return self._last_start
 
     def upsert_candle(self, row: CandleRow) -> None:

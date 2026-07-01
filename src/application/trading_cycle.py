@@ -45,7 +45,8 @@ class RunTradingCycleUseCase:
             return None
 
         candles = self._candle_store.recent_candles(
-            self._symbol, self._resolution, self._strategy.required_candles)
+            symbol=self._symbol, resolution=self._resolution,
+            count=self._strategy.required_candles)
 
         if len(candles) < self._strategy.required_candles:
             return None
