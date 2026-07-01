@@ -38,6 +38,7 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
+    load_dotenv()
     _config = load_config()
     _conn = connect(_config.database_url)
     run_migrations(_conn)
