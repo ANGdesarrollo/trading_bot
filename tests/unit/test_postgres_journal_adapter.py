@@ -104,7 +104,7 @@ def test_open_entries_maps_rows_to_journal_entries():
     row = (
         "D1", "EURUSD", "BUY", _NOW, _NOW,
         1.10, 0.0020, 0.0020, 0.0010, 10000.0,
-        None, None,
+        None, None, "capital",
     )
     conn = _FakeConn(rows=[row])
     adapter = PostgresTradeJournal(conn)
@@ -112,6 +112,7 @@ def test_open_entries_maps_rows_to_journal_entries():
     assert len(entries) == 1
     assert entries[0].deal_id == "D1"
     assert entries[0].symbol == "EURUSD"
+    assert entries[0].provider == "capital"
 
 
 def test_open_entries_returns_empty_when_no_open_rows():

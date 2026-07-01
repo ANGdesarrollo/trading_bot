@@ -10,8 +10,8 @@ _INSERT_ENTRY = """
 INSERT INTO trade_entries (
     deal_id, symbol, direction, opened_at, decision_candle_ts,
     filled_price, sl_distance, tp_distance, atr_at_entry, position_size,
-    bid_at_decision, ask_at_decision
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    bid_at_decision, ask_at_decision, provider
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (deal_id) DO NOTHING
 """
 
@@ -31,7 +31,7 @@ WHERE deal_id = %s
 _SELECT_OPEN = """
 SELECT deal_id, symbol, direction, opened_at, decision_candle_ts,
        filled_price, sl_distance, tp_distance, atr_at_entry, position_size,
-       bid_at_decision, ask_at_decision
+       bid_at_decision, ask_at_decision, provider
 FROM trade_entries
 WHERE reconciled_at IS NULL
 """
@@ -41,7 +41,7 @@ def _row_to_entry(row: tuple) -> JournalEntry:
     (
         deal_id, symbol, direction, opened_at, decision_candle_ts,
         filled_price, sl_distance, tp_distance, atr_at_entry, position_size,
-        bid_at_decision, ask_at_decision,
+        bid_at_decision, ask_at_decision, provider,
     ) = row
     return JournalEntry(
         deal_id=deal_id,
@@ -56,6 +56,7 @@ def _row_to_entry(row: tuple) -> JournalEntry:
         position_size=position_size,
         bid_at_decision=bid_at_decision,
         ask_at_decision=ask_at_decision,
+        provider=provider,
     )
 
 
@@ -71,6 +72,7 @@ class PostgresTradeJournal(TradeJournalPort):
                 entry.filled_price, entry.sl_distance, entry.tp_distance,
                 entry.atr_at_entry, entry.position_size,
                 entry.bid_at_decision, entry.ask_at_decision,
+                entry.provider,
             ))
         self._conn.commit()
 

@@ -70,6 +70,32 @@ def test_record_entry_then_open_entries_round_trip(pg_conn):
     assert any(e.deal_id == "D_INT_1" for e in open_)
 
 
+def test_provider_persisted_and_read_back(pg_conn):
+    from domain.entities.journal import JournalEntry
+    from infrastructure.postgres.journal_adapter import PostgresTradeJournal
+    adapter = PostgresTradeJournal(pg_conn)
+    entry = JournalEntry(
+        deal_id="D_PROVIDER_1",
+        symbol="EURUSD",
+        direction="BUY",
+        opened_at=_NOW,
+        decision_candle_ts=_NOW,
+        filled_price=1.10,
+        sl_distance=0.0020,
+        tp_distance=0.0020,
+        atr_at_entry=0.0010,
+        position_size=10000.0,
+        bid_at_decision=None,
+        ask_at_decision=None,
+        provider="ic_markets",
+    )
+    adapter.record_entry(entry)
+    open_ = adapter.open_entries()
+    matched = [e for e in open_ if e.deal_id == "D_PROVIDER_1"]
+    assert len(matched) == 1
+    assert matched[0].provider == "ic_markets"
+
+
 def test_record_result_closes_entry_guard(pg_conn):
     from infrastructure.postgres.journal_adapter import PostgresTradeJournal
     adapter = PostgresTradeJournal(pg_conn)
