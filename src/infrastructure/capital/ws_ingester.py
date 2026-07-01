@@ -8,10 +8,12 @@ from domain.ports.candle_history_port import CandleHistoryPort
 from domain.ports.candle_store_port import CandleStorePort
 from infrastructure.capital._pair_buffer import PairBuffer
 from infrastructure.capital.session import CapitalSession
+from infrastructure.capital.ws_transport import RecvTimeout
 
 _log = logging.getLogger(__name__)
 
 _RECONNECT_DELAY_S = 2.0
+_TOKEN_REFRESH_S = 540.0
 
 _OHLC_EVENT = "ohlc.event"
 
@@ -119,16 +121,21 @@ class CapitalWsIngester:
         )
         if last_ping is None:
             last_ping = self._clock.utcnow()
+        last_auth = self._clock.utcnow()
 
         while True:
             now = self._clock.utcnow()
-            elapsed = (now - last_ping).total_seconds()
-            if elapsed >= self._ping_interval:
+            if (now - last_ping).total_seconds() >= self._ping_interval:
                 self._transport.ping()
-                self._session.authenticate()
                 last_ping = now
+            if (now - last_auth).total_seconds() >= _TOKEN_REFRESH_S:
+                self._session.authenticate()
+                last_auth = now
 
-            raw = self._transport.recv()
+            try:
+                raw = self._transport.recv()
+            except RecvTimeout:
+                continue
             msg = json.loads(raw)
             if msg.get("destination") == _OHLC_EVENT:
                 pair_buffer.on_event(msg, self._store.upsert_candle)

@@ -233,9 +233,9 @@ def test_duplicate_symbol_raises_value_error():
 # Slice 1 — ws-candle-ingestion config fields
 # ---------------------------------------------------------------------------
 
-def test_ws_ping_interval_seconds_defaults_to_540():
+def test_ws_ping_interval_seconds_defaults_to_45():
     cfg = _load_config(_REQUIRED_ENV)
-    assert cfg.ws_ping_interval_seconds == 540
+    assert cfg.ws_ping_interval_seconds == 45
 
 
 def test_ws_ping_interval_seconds_env_override():

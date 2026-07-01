@@ -370,7 +370,7 @@ def test_session_reauthenticated_on_refresh_tick():
             self._clk.advance(self._advance_s)
             return super().recv()
 
-    transport = AdvancingTransport([_subscribe_ack()], clock, advance_s=6)
+    transport = AdvancingTransport([_subscribe_ack()], clock, advance_s=600)
 
     ingester = CapitalWsIngester(
         session=session,
