@@ -68,7 +68,6 @@ if __name__ == "__main__":
         http=_http,
         base_url=_config.base_url,
         epic_resolution_map=_period_seconds,
-        provider=_config.provider,
     )
     _ingester = CapitalWsIngester(
         session=_capital_session,

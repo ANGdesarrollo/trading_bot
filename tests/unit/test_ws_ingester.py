@@ -436,3 +436,4 @@ def test_configured_provider_flows_to_fetch_history():
 
     provider, *_ = history.calls[0]
     assert provider == "ic_markets"
+    assert store.last_candle_start_calls[0][0] == "ic_markets"

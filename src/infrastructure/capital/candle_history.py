@@ -36,13 +36,11 @@ class CapitalCandleHistory(CandleHistoryPort):
         http,
         base_url: str,
         epic_resolution_map: dict[tuple[str, str], int] | None = None,
-        provider: str = "capital",
     ) -> None:
         self._session = session
         self._http = http
         self._base_url = base_url.rstrip("/")
         self._epic_resolution_map: dict[tuple[str, str], int] = epic_resolution_map or {}
-        self._provider = provider
 
     def fetch_history(
         self,
@@ -60,11 +58,12 @@ class CapitalCandleHistory(CandleHistoryPort):
         }
 
         if since is None:
-            return self._cold_backfill(epic, resolution, count, auth_headers)
-        return self._gap_fill(epic, resolution, since, auth_headers)
+            return self._cold_backfill(provider, epic, resolution, count, auth_headers)
+        return self._gap_fill(provider, epic, resolution, since, auth_headers)
 
     def _cold_backfill(
         self,
+        provider: str,
         epic: str,
         resolution: str,
         count: int,
@@ -74,10 +73,11 @@ class CapitalCandleHistory(CandleHistoryPort):
         url = f"{self._base_url}/prices/{epic}?resolution={resolution}&max={fetch_count}"
         records = self._fetch_prices(url, auth_headers)
         closed = records[:-1]
-        return _to_rows(self._provider, epic, resolution, closed)
+        return _to_rows(provider, epic, resolution, closed)
 
     def _gap_fill(
         self,
+        provider: str,
         epic: str,
         resolution: str,
         since: datetime,
@@ -90,7 +90,7 @@ class CapitalCandleHistory(CandleHistoryPort):
             f"?resolution={resolution}&from={from_iso}&to={to_iso}"
         )
         records = self._fetch_prices(url, auth_headers)
-        return _to_rows(self._provider, epic, resolution, records)
+        return _to_rows(provider, epic, resolution, records)
 
     def _fetch_prices(self, url: str, auth_headers: dict[str, str]) -> list[dict]:
         response = self._http.get(url, headers=auth_headers)
