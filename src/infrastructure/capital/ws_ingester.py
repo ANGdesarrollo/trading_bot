@@ -52,6 +52,7 @@ class CapitalWsIngester:
         ws_ping_interval_seconds: int,
         required_candles: int,
         max_reconnect_attempts: int = 0,
+        provider: str = "capital",
     ) -> None:
         self._session = session
         self._store = store
@@ -64,6 +65,7 @@ class CapitalWsIngester:
         self._ping_interval = ws_ping_interval_seconds
         self._required_candles = required_candles
         self._max_reconnect_attempts = max_reconnect_attempts
+        self._provider = provider
 
     def run_once(self) -> None:
         attempts = 0
@@ -107,17 +109,21 @@ class CapitalWsIngester:
 
     def _backfill_or_gap_fill(self) -> None:
         for epic in self._epics:
-            last = self._store.last_candle_start(symbol=epic, resolution=self._resolution)
+            last = self._store.last_candle_start(
+                provider=self._provider, symbol=epic, resolution=self._resolution
+            )
             if last is None:
                 rows = self._history.fetch_history(
-                    epic=epic, resolution=self._resolution, count=self._required_candles, since=None
+                    provider=self._provider, epic=epic,
+                    resolution=self._resolution, count=self._required_candles, since=None
                 )
             else:
                 period_s = self._period_seconds.get((epic, self._resolution), 60)
                 from datetime import timedelta
                 since = last + timedelta(seconds=period_s)
                 rows = self._history.fetch_history(
-                    epic=epic, resolution=self._resolution, count=self._required_candles, since=since
+                    provider=self._provider, epic=epic,
+                    resolution=self._resolution, count=self._required_candles, since=since
                 )
             for row in rows:
                 self._store.upsert_candle(row)
@@ -127,7 +133,8 @@ class CapitalWsIngester:
             period_ms_map={
                 (epic, self._resolution): self._period_seconds.get((epic, self._resolution), 60) * 1000
                 for epic in self._epics
-            }
+            },
+            provider=self._provider,
         )
         if last_ping is None:
             last_ping = self._clock.utcnow()

@@ -198,6 +198,7 @@ def _make_ingester(
     ping_interval: int = 540,
     required_candles: int = 3,
     last_start=_SENTINEL,
+    provider: str = "capital",
 ) -> CapitalWsIngester:
     if last_start is not _SENTINEL:
         store._last_start = last_start
@@ -212,6 +213,7 @@ def _make_ingester(
         period_seconds={(_EPIC, _RES): _PERIOD_S},
         ws_ping_interval_seconds=ping_interval,
         required_candles=required_candles,
+        provider=provider,
     )
 
 
@@ -420,3 +422,17 @@ def test_backfill_records_capital_as_provider():
     assert len(history.calls) == 1
     provider, *_ = history.calls[0]
     assert provider == "capital"
+
+
+def test_configured_provider_flows_to_fetch_history():
+    history = FakeHistory([_row(_T_DT)])
+    store = FakeStore(last_start=None)
+    transport = FakeWsTransport([_subscribe_ack()])
+
+    ingester = _make_ingester(
+        transport, store, history, required_candles=1, provider="ic_markets"
+    )
+    ingester.run_once()
+
+    provider, *_ = history.calls[0]
+    assert provider == "ic_markets"
