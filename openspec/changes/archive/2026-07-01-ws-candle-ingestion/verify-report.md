@@ -1,9 +1,9 @@
 # Verify Report: ws-candle-ingestion
 
-**Change:** ws-candle-ingestion  
-**Phase:** verify  
-**Date:** 2026-07-01  
-**Suite result:** 187 passed, 18 skipped (0 failures)  
+**Change:** ws-candle-ingestion
+**Phase:** verify
+**Date:** 2026-07-01
+**Suite result:** 187 passed, 18 skipped (0 failures)
 **Verdict: PASS WITH WARNINGS**
 
 ---
@@ -147,28 +147,28 @@ The `__main__.py:build_use_cases` has a test seam `candle_store=None`. Behavior:
 
 ### WARNING — W1: recent_candles SQL has no resolution filter
 
-**File:** `src/infrastructure/postgres/candle_store.py:27-35`  
-**What:** `_SELECT_RECENT` WHERE clause uses only `epic`, not `(epic, resolution)`.  
-**Risk:** Safe for single-resolution deployment. Would silently return mixed-timeframe data if the `candles` table ever contains multiple resolutions for the same epic.  
+**File:** `src/infrastructure/postgres/candle_store.py:27-35`
+**What:** `_SELECT_RECENT` WHERE clause uses only `epic`, not `(epic, resolution)`.
+**Risk:** Safe for single-resolution deployment. Would silently return mixed-timeframe data if the `candles` table ever contains multiple resolutions for the same epic.
 **Action required before multi-timeframe:** Add `AND resolution = %s` to `_SELECT_RECENT` and update the port signature.
 
 ### WARNING — W2: ohlc.event envelope not validated against real WS capture
 
-**File:** `src/infrastructure/capital/_pair_buffer.py` + `ws_ingester.py`  
-**What:** Field names (`epic`, `resolution`, `t`, `o/h/l/c`, `priceType`) are confirmed by the apply-time note in `apply-progress.md` and encoded in test fixtures, but no `ws_event_fixture.json` with a real captured message is committed to the repo.  
-**Risk:** If the live Capital WS envelope differs (e.g., nesting, different field names), the ingester will silently drop all events (the `msg.get("destination") == "ohlc.event"` guard will not match, or `payload["epic"]` will raise `KeyError`).  
+**File:** `src/infrastructure/capital/_pair_buffer.py` + `ws_ingester.py`
+**What:** Field names (`epic`, `resolution`, `t`, `o/h/l/c`, `priceType`) are confirmed by the apply-time note in `apply-progress.md` and encoded in test fixtures, but no `ws_event_fixture.json` with a real captured message is committed to the repo.
+**Risk:** If the live Capital WS envelope differs (e.g., nesting, different field names), the ingester will silently drop all events (the `msg.get("destination") == "ohlc.event"` guard will not match, or `payload["epic"]` will raise `KeyError`).
 **Action required before production:** Run a short manual session, capture one real message, commit it as `tests/fixtures/ws_ohlc_event.json`, and add an assertion that `PairBuffer.on_event` processes it correctly.
 
 ### WARNING — W3: build_use_cases candle_store=None + journal provided opens a new DB conn
 
-**File:** `src/__main__.py:82-83`  
-**What:** `elif candle_store is None: candle_store = PostgresCandleStore(connect(config.database_url))` creates a second connection not shared with the journal. In the unit test suite this is never reached (tests always pass an explicit fake). In an integration scenario providing only a journal, two connections would be opened.  
-**Risk:** Not a correctness bug under current test coverage. Potential resource-management issue in integration tests or if `DATABASE_URL` is absent when this branch is reached.  
+**File:** `src/__main__.py:82-83`
+**What:** `elif candle_store is None: candle_store = PostgresCandleStore(connect(config.database_url))` creates a second connection not shared with the journal. In the unit test suite this is never reached (tests always pass an explicit fake). In an integration scenario providing only a journal, two connections would be opened.
+**Risk:** Not a correctness bug under current test coverage. Potential resource-management issue in integration tests or if `DATABASE_URL` is absent when this branch is reached.
 **Action:** Low priority. Could be resolved by passing `conn` through the seam if both journal and store need to share it.
 
 ### SUGGESTION — S1: redundant double-check in _pair_buffer.py
 
-**File:** `src/infrastructure/capital/_pair_buffer.py:63-65`  
+**File:** `src/infrastructure/capital/_pair_buffer.py:63-65`
 ```python
 if buf_key not in self._partials:
     if buf_key not in self._partials:   # identical check — dead code

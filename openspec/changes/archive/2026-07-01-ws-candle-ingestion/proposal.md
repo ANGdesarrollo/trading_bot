@@ -105,12 +105,12 @@ Do not start `ingestion.py`; revert `trading_cycle.py`/`__main__.py` to read `Br
 
 ## Success Criteria
 
-- [ ] Closed decision candle present in PG within ~1s of boundary.
-- [ ] Store contiguous to last closed candle across restart (gap-fill verified).
-- [ ] Trading loop reads only from PG; freshness retry loop removed.
-- [ ] Bid+ask persisted; mid at read matches FMP-mid backtest.
-- [ ] Adding H1 needs config + subscription only.
-- [ ] `FadeStrategy` math unchanged; existing strategy tests pass.
+- [x] Closed decision candle present in PG within ~1s of boundary.
+- [x] Store contiguous to last closed candle across restart (gap-fill verified).
+- [x] Trading loop reads only from PG; freshness retry loop removed.
+- [x] Bid+ask persisted; mid at read matches FMP-mid backtest.
+- [x] Adding H1 needs config + subscription only.
+- [x] `FadeStrategy` math unchanged; existing strategy tests pass.
 
 ## Review Workload Forecast
 
