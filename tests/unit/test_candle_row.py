@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -69,3 +69,9 @@ def test_candle_row_naive_datetime_raises():
     naive = datetime(2024, 1, 1, 12, 0, 0)
     with pytest.raises(ValueError, match="UTC"):
         _make_row(candle_start=naive)
+
+
+def test_candle_row_aware_non_utc_datetime_raises():
+    non_utc = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone(timedelta(hours=5)))
+    with pytest.raises(ValueError, match="UTC"):
+        _make_row(candle_start=non_utc)

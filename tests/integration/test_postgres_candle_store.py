@@ -74,7 +74,7 @@ def test_recent_candles_returns_three_oldest_first_mid_derived(pg_conn):
     assert candles[0].timestamp == _T3
     assert candles[1].timestamp == _T4
     assert candles[2].timestamp == _T5
-    assert candles[0].open == pytest.approx((1.08 + 1.081) / 2)
+    assert candles[0].open == pytest.approx(1.0805)
 
 
 def test_recent_candles_respects_count_cap(pg_conn):
