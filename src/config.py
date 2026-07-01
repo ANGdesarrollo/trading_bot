@@ -1,10 +1,3 @@
-"""Trading engine configuration — single source of truth for all runtime parameters.
-
-Frozen strategy constants (L_FROZEN, ATR_PERIOD, etc.) live ONLY in
-domain.strategy.fade (vendored) and are imported by the domain adapter — never
-duplicated here.
-"""
-
 from __future__ import annotations
 
 import os
@@ -15,6 +8,8 @@ _DEMO_BASE_URL = "https://demo-api-capital.backend-capital.com/api/v1"
 _LIVE_BASE_URL = "https://api-capital.backend-capital.com/api/v1"  # UNVERIFIED
 
 WARMUP_BARS = 128
+
+_WS_PING_MAX_SECONDS = 600
 
 
 def _resolve_base_url(mode: str) -> str:
@@ -48,11 +43,12 @@ class Config:
     warmup_bars: int
     candle_settle_seconds: int
     poll_minutes: int
-    freshness_max_retries: int
-    freshness_retry_seconds: float
     reconciler_interval_seconds: int
     session_refresh_ttl_seconds: float
     database_url: str
+    ws_ping_interval_seconds: int
+    required_candles: int
+    backfill_max_candles: int
 
     @property
     def epics(self) -> dict[str, str]:
@@ -103,10 +99,16 @@ def load_config() -> Config:
     warmup_bars = int(env.get("WARMUP", str(WARMUP_BARS)))
     candle_settle_seconds = int(env.get("CANDLE_SETTLE_SECONDS", "5"))
     poll_minutes = int(env.get("POLL_MINUTES", "15"))
-    freshness_max_retries = int(env.get("FRESHNESS_MAX_RETRIES", "3"))
-    freshness_retry_seconds = float(env.get("FRESHNESS_RETRY_SECONDS", "2.0"))
     reconciler_interval_seconds = int(env.get("RECONCILER_INTERVAL_SECONDS", "300"))
     session_refresh_ttl_seconds = float(env.get("SESSION_REFRESH_TTL_SECONDS", "540"))
+    ws_ping_interval_seconds = int(env.get("WS_PING_INTERVAL_SECONDS", "540"))
+    backfill_max_candles = int(env.get("BACKFILL_MAX_CANDLES", "500"))
+
+    if ws_ping_interval_seconds >= _WS_PING_MAX_SECONDS:
+        raise ValueError(
+            f"WS_PING_INTERVAL_SECONDS must be < {_WS_PING_MAX_SECONDS}, "
+            f"got {ws_ping_interval_seconds}"
+        )
 
     missing_shared = [name for name, val in [
         ("CAPITAL_API_KEY", api_key),
@@ -132,9 +134,10 @@ def load_config() -> Config:
         warmup_bars=warmup_bars,
         candle_settle_seconds=candle_settle_seconds,
         poll_minutes=poll_minutes,
-        freshness_max_retries=freshness_max_retries,
-        freshness_retry_seconds=freshness_retry_seconds,
         reconciler_interval_seconds=reconciler_interval_seconds,
         session_refresh_ttl_seconds=session_refresh_ttl_seconds,
         database_url=database_url,
+        ws_ping_interval_seconds=ws_ping_interval_seconds,
+        required_candles=warmup_bars,
+        backfill_max_candles=backfill_max_candles,
     )

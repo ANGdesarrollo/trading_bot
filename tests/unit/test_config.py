@@ -19,8 +19,8 @@ def _load_config(env: dict[str, str]):
         or k in (
             "MODE", "CAPITAL_API_KEY", "IDENTIFIER", "PASSWORD", "DATABASE_URL",
             "TIMEFRAME", "WARMUP", "CANDLE_SETTLE_SECONDS", "POLL_MINUTES",
-            "FRESHNESS_MAX_RETRIES", "FRESHNESS_RETRY_SECONDS",
             "RECONCILER_INTERVAL_SECONDS", "SESSION_REFRESH_TTL_SECONDS",
+            "WS_PING_INTERVAL_SECONDS", "BACKFILL_MAX_CANDLES",
             "I_UNDERSTAND_THIS_IS_REAL_MONEY",
         )
     }
@@ -99,21 +99,6 @@ def test_legacy_api_key_only_raises_system_exit():
     with pytest.raises(SystemExit):
         _load_config(env)
 
-
-def test_freshness_fields_default_values():
-    config = _load_config(_REQUIRED_ENV)
-    assert config.freshness_max_retries == 3
-    assert config.freshness_retry_seconds == 2.0
-
-
-def test_freshness_fields_env_override():
-    config = _load_config({
-        **_REQUIRED_ENV,
-        "FRESHNESS_MAX_RETRIES": "5",
-        "FRESHNESS_RETRY_SECONDS": "1.5",
-    })
-    assert config.freshness_max_retries == 5
-    assert config.freshness_retry_seconds == 1.5
 
 
 def test_reconciler_interval_defaults_to_300():
@@ -242,3 +227,48 @@ def test_duplicate_symbol_raises_value_error():
     }
     with pytest.raises(ValueError, match="EURUSD"):
         _load_config(env)
+
+
+# ---------------------------------------------------------------------------
+# Slice 1 — ws-candle-ingestion config fields
+# ---------------------------------------------------------------------------
+
+def test_ws_ping_interval_seconds_defaults_to_540():
+    cfg = _load_config(_REQUIRED_ENV)
+    assert cfg.ws_ping_interval_seconds == 540
+
+
+def test_ws_ping_interval_seconds_env_override():
+    cfg = _load_config({**_REQUIRED_ENV, "WS_PING_INTERVAL_SECONDS": "300"})
+    assert cfg.ws_ping_interval_seconds == 300
+
+
+def test_ws_ping_interval_seconds_must_be_less_than_600():
+    with pytest.raises((ValueError, SystemExit)):
+        _load_config({**_REQUIRED_ENV, "WS_PING_INTERVAL_SECONDS": "600"})
+
+
+def test_required_candles_equals_warmup_bars():
+    cfg = _load_config({**_REQUIRED_ENV, "WARMUP": "64"})
+    assert cfg.required_candles == 64
+
+
+def test_required_candles_default_is_128():
+    cfg = _load_config(_REQUIRED_ENV)
+    assert cfg.required_candles == 128
+
+
+def test_backfill_max_candles_defaults_to_500():
+    cfg = _load_config(_REQUIRED_ENV)
+    assert cfg.backfill_max_candles == 500
+
+
+def test_backfill_max_candles_env_override():
+    cfg = _load_config({**_REQUIRED_ENV, "BACKFILL_MAX_CANDLES": "1000"})
+    assert cfg.backfill_max_candles == 1000
+
+
+def test_freshness_fields_absent_from_config():
+    cfg = _load_config(_REQUIRED_ENV)
+    assert not hasattr(cfg, "freshness_max_retries")
+    assert not hasattr(cfg, "freshness_retry_seconds")

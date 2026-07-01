@@ -77,6 +77,19 @@ def test_runner_skips_already_applied_migration():
         assert "CREATE TABLE already_there" not in sql_executed
 
 
+def test_002_create_candles_sql_is_discovered_and_applied():
+    from pathlib import Path
+    real_migrations_dir = (
+        Path(__file__).parent.parent.parent
+        / "src" / "infrastructure" / "postgres" / "migrations"
+    )
+    conn = _FakeConn(applied_rows=[("001_create_trade_entries.sql",)])
+    run_migrations(conn, migrations_dir=real_migrations_dir)
+    sql_executed = " ".join(conn._cursor.executed)
+    assert "candles" in sql_executed.lower()
+    assert "idx_candles_recent" in sql_executed.lower()
+
+
 def test_runner_applies_new_migration_when_first_already_applied():
     with tempfile.TemporaryDirectory() as tmp:
         migrations_dir = Path(tmp)
