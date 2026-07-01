@@ -49,7 +49,9 @@ def _prices_body(items: list[dict]) -> dict:
     }
 
 
-def _make_adapter(responses: list[dict]) -> tuple[CapitalCandleHistory, FakeHttp]:
+def _make_adapter(
+    responses: list[dict], provider: str = "capital"
+) -> tuple[CapitalCandleHistory, FakeHttp]:
     canns = [CannedResponse(status_code=200, json_body=b) for b in responses]
     http = FakeHttp(canns)
     return CapitalCandleHistory(
@@ -57,6 +59,7 @@ def _make_adapter(responses: list[dict]) -> tuple[CapitalCandleHistory, FakeHttp
         http=http,
         base_url=_BASE,
         epic_resolution_map={(_EPIC, _RESOLUTION): 60},
+        provider=provider,
     ), http
 
 
@@ -129,3 +132,21 @@ def test_gap_fill_returns_rows_without_dropping_last():
 
     assert len(rows) == 3
     assert rows[2].candle_start == _T3_DT
+
+
+def test_cold_backfill_stamps_default_provider():
+    items = [_price_item(_T1_ISO), _price_item(_T2_ISO)]
+    adapter, _ = _make_adapter([_prices_body(items)])
+
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=1, since=None)
+
+    assert all(row.provider == "capital" for row in rows)
+
+
+def test_cold_backfill_stamps_configured_provider():
+    items = [_price_item(_T1_ISO), _price_item(_T2_ISO)]
+    adapter, _ = _make_adapter([_prices_body(items)], provider="ic_markets")
+
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=1, since=None)
+
+    assert all(row.provider == "ic_markets" for row in rows)

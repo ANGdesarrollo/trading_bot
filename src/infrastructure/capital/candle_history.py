@@ -36,11 +36,13 @@ class CapitalCandleHistory(CandleHistoryPort):
         http,
         base_url: str,
         epic_resolution_map: dict[tuple[str, str], int] | None = None,
+        provider: str = "capital",
     ) -> None:
         self._session = session
         self._http = http
         self._base_url = base_url.rstrip("/")
         self._epic_resolution_map: dict[tuple[str, str], int] = epic_resolution_map or {}
+        self._provider = provider
 
     def fetch_history(
         self,
@@ -72,7 +74,7 @@ class CapitalCandleHistory(CandleHistoryPort):
         url = f"{self._base_url}/prices/{epic}?resolution={resolution}&max={fetch_count}"
         records = self._fetch_prices(url, auth_headers)
         closed = records[:-1]
-        return _to_rows(epic, resolution, closed)
+        return _to_rows(self._provider, epic, resolution, closed)
 
     def _gap_fill(
         self,
@@ -88,7 +90,7 @@ class CapitalCandleHistory(CandleHistoryPort):
             f"?resolution={resolution}&from={from_iso}&to={to_iso}"
         )
         records = self._fetch_prices(url, auth_headers)
-        return _to_rows(epic, resolution, records)
+        return _to_rows(self._provider, epic, resolution, records)
 
     def _fetch_prices(self, url: str, auth_headers: dict[str, str]) -> list[dict]:
         response = self._http.get(url, headers=auth_headers)
@@ -102,6 +104,7 @@ def _parse_snapshot(record: dict) -> datetime:
 
 
 def _to_rows(
+    provider: str,
     epic: str,
     resolution: str,
     records: list[dict],
@@ -113,6 +116,7 @@ def _to_rows(
         low_price = record["lowPrice"]
         close_price = record["closePrice"]
         rows.append(CandleRow(
+            provider=provider,
             epic=epic,
             resolution=resolution,
             candle_start=_parse_snapshot(record),
