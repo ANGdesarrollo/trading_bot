@@ -85,6 +85,8 @@ class CapitalCandleHistory(CandleHistoryPort):
     ) -> Sequence[CandleRow]:
         from_iso = _to_iso(since)
         to_iso = _now_iso()
+        if from_iso >= to_iso:
+            return []
         url = (
             f"{self._base_url}/prices/{epic}"
             f"?resolution={resolution}&from={from_iso}&to={to_iso}"

@@ -160,3 +160,15 @@ def test_gap_fill_stamps_configured_provider():
     )
 
     assert all(row.provider == "ic_markets" for row in rows)
+
+
+def test_gap_fill_skips_request_when_since_is_in_the_future():
+    future_since = datetime(2999, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    adapter, http = _make_adapter([])
+
+    rows = adapter.fetch_history(
+        epic=_EPIC, resolution=_RESOLUTION, count=10, since=future_since
+    )
+
+    assert list(rows) == []
+    assert http.calls == []
