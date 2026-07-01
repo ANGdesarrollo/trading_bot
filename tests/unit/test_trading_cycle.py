@@ -119,8 +119,37 @@ def test_short_store_returns_none():
     assert broker.open_position_calls == []
 
 
+def test_candle_arriving_late_is_picked_up_on_retry():
+    clock = FakeClock(_CLOCK_SEED)
+    order = OrderResult(order_id="deal-late", status="OPEN", filled_price=1.1001)
+    broker = FakeBroker(has_open=False, order_result=order)
+
+    class LateStore(FakeCandleStore):
+        def __init__(self):
+            super().__init__(candles=[_stale_candle()] * _REQUIRED)
+            self._reads = 0
+
+        def recent_candles(self, **kwargs):
+            self.recent_candles_calls.append(
+                (kwargs["provider"], kwargs["symbol"], kwargs["resolution"], kwargs["count"]))
+            self._reads += 1
+            if self._reads >= 3:
+                return [_fresh_candle()] * _REQUIRED
+            return [_stale_candle()] * _REQUIRED
+
+    store = LateStore()
+    strategy = _FixedSignalStrategy(_make_signal())
+    uc = _make_use_case(broker, strategy, store, clock=clock)
+
+    result = uc.execute()
+
+    assert result is not None
+    assert len(broker.open_position_calls) == 1
+    assert len(clock.sleep_calls) == 2  # waited twice, got the candle on the 3rd read
+
+
 # AC-TC-2
-def test_stale_store_returns_none_no_retry(caplog):
+def test_stale_store_retries_then_gives_up(caplog):
     clock = FakeClock(_CLOCK_SEED)
     broker = FakeBroker(has_open=False)
     store = FakeCandleStore(candles=[_stale_candle()] * _REQUIRED)
@@ -131,12 +160,12 @@ def test_stale_store_returns_none_no_retry(caplog):
         result = uc.execute()
 
     assert result is None
-    assert clock.sleep_calls == []
-    assert len(store.recent_candles_calls) == 1
+    assert len(clock.sleep_calls) == 10
+    assert len(store.recent_candles_calls) == 10
     provider, _sym, _res, _count = store.recent_candles_calls[0]
     assert provider == "capital"
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("stale" in m.lower() for m in warnings)
+    assert any("never arrived" in m.lower() for m in warnings)
     assert broker.open_position_calls == []
 
 
