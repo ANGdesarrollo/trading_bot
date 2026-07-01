@@ -19,13 +19,14 @@ from application.trading_cycle import RunTradingCycleUseCase
 from domain.adapters.fade_strategy import FadeStrategy
 from domain.ports.trade_journal_port import TradeJournalPort
 from infrastructure.capital.broker import CapitalBrokerAdapter
-from infrastructure.capital.cached_session import CachedSession
 from infrastructure.capital.clock import SystemClock
 from infrastructure.capital.session import CapitalSession
+from infrastructure.capital.shared_cached_session import SharedCachedSession
 from infrastructure.postgres.candle_store import PostgresCandleStore
 from infrastructure.postgres.connection import connect
 from infrastructure.postgres.journal_adapter import PostgresTradeJournal
 from infrastructure.postgres.migration_runner import run_migrations
+from infrastructure.postgres.session_cache import PostgresSessionCache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,26 +48,14 @@ def seconds_until_next_boundary(now: datetime, period_minutes: int) -> float:
     return float(wait)
 
 
-def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None, candle_store=None):
-    capital_session = CapitalSession(
-        http=http,
-        base_url=config.base_url,
-        api_key=config.api_key,
-        identifier=config.identifier,
-        password=config.password,
-    )
-    session = CachedSession(
-        inner=capital_session,
-        clock=clock,
-        refresh_ttl_seconds=config.session_refresh_ttl_seconds,
-    )
-    broker = CapitalBrokerAdapter(
-        session=capital_session,
-        http=http,
-        base_url=config.base_url,
-        epics=config.epics,
-        timeframe=config.timeframe,
-    )
+def build_use_cases(
+    config,
+    http,
+    clock,
+    journal: TradeJournalPort | None = None,
+    candle_store=None,
+    session_cache=None,
+):
     strategy = FadeStrategy()
     if config.warmup_bars < strategy.required_candles:
         raise SystemExit(
@@ -79,6 +68,32 @@ def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None
         journal = PostgresTradeJournal(conn)
         if candle_store is None:
             candle_store = PostgresCandleStore(conn)
+        if session_cache is None:
+            session_cache = PostgresSessionCache(conn)
+
+    capital_session = CapitalSession(
+        http=http,
+        base_url=config.base_url,
+        api_key=config.api_key,
+        identifier=config.identifier,
+        password=config.password,
+        clock=clock,
+        max_auth_retries=config.auth_max_retries,
+    )
+    session = SharedCachedSession(
+        inner=capital_session,
+        cache=session_cache,
+        clock=clock,
+        refresh_ttl_seconds=config.session_refresh_ttl_seconds,
+        owner=False,
+    )
+    broker = CapitalBrokerAdapter(
+        session=session,
+        http=http,
+        base_url=config.base_url,
+        epics=config.epics,
+        timeframe=config.timeframe,
+    )
     use_cases = [
         RunTradingCycleUseCase(
             broker=broker,

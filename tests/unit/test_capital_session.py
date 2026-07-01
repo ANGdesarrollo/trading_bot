@@ -6,13 +6,20 @@ Scenarios:
   5.3 — non-2xx raises AuthenticationError, no tokens stored
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from infrastructure.capital.session import AuthenticationError, CapitalSession
+from tests.fakes.fake_clock import FakeClock
 from tests.fakes.fake_http import CannedResponse, FakeHttp
 
 
-def _make_session(responses: list[CannedResponse]) -> tuple[CapitalSession, FakeHttp]:
+def _make_session(
+    responses: list[CannedResponse],
+    clock: FakeClock | None = None,
+    max_auth_retries: int = 0,
+) -> tuple[CapitalSession, FakeHttp]:
     http = FakeHttp(responses)
     session = CapitalSession(
         http=http,
@@ -20,8 +27,26 @@ def _make_session(responses: list[CannedResponse]) -> tuple[CapitalSession, Fake
         api_key="test-key",
         identifier="user@example.com",
         password="secret",
+        clock=clock,
+        max_auth_retries=max_auth_retries,
     )
     return session, http
+
+
+def _ok(cst: str = "cst", xst: str = "xst") -> CannedResponse:
+    return CannedResponse(
+        status_code=200,
+        headers={"CST": cst, "X-SECURITY-TOKEN": xst},
+        json_body={},
+    )
+
+
+def _rate_limited() -> CannedResponse:
+    return CannedResponse(status_code=429, headers={}, json_body={})
+
+
+def _seeded_clock() -> FakeClock:
+    return FakeClock(datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc))
 
 
 def test_successful_auth_stores_cst_and_security_token():
@@ -157,3 +182,56 @@ def test_tokens_still_works_after_streaming_host_captured():
 
     assert tokens.cst == "cst-t"
     assert tokens.security_token == "xst-t"
+
+
+def test_retries_on_429_then_succeeds():
+    clock = _seeded_clock()
+    session, http = _make_session(
+        [_rate_limited(), _ok("cst-final", "xst-final")],
+        clock=clock,
+        max_auth_retries=3,
+    )
+
+    tokens = session.authenticate()
+
+    assert tokens.cst == "cst-final"
+    assert len(http.calls) == 2
+    assert len(clock.sleep_calls) == 1
+
+
+def test_gives_up_after_max_retries_on_persistent_429():
+    clock = _seeded_clock()
+    session, http = _make_session(
+        [_rate_limited(), _rate_limited(), _rate_limited()],
+        clock=clock,
+        max_auth_retries=2,
+    )
+
+    with pytest.raises(AuthenticationError):
+        session.authenticate()
+
+    assert len(http.calls) == 3
+
+
+def test_does_not_retry_on_401():
+    clock = _seeded_clock()
+    session, http = _make_session(
+        [CannedResponse(status_code=401, headers={}, json_body={})],
+        clock=clock,
+        max_auth_retries=3,
+    )
+
+    with pytest.raises(AuthenticationError):
+        session.authenticate()
+
+    assert len(http.calls) == 1
+    assert clock.sleep_calls == []
+
+
+def test_no_retry_by_default_preserves_existing_behavior():
+    session, http = _make_session([_rate_limited()])
+
+    with pytest.raises(AuthenticationError):
+        session.authenticate()
+
+    assert len(http.calls) == 1

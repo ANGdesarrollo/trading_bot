@@ -22,15 +22,16 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
 
     from config import load_config
-    from infrastructure.capital.cached_session import CachedSession
     from infrastructure.capital.candle_history import CapitalCandleHistory
     from infrastructure.capital.clock import SystemClock
     from infrastructure.capital.session import CapitalSession
+    from infrastructure.capital.shared_cached_session import SharedCachedSession
     from infrastructure.capital.ws_ingester import CapitalWsIngester
     from infrastructure.capital.ws_transport import WebsocketClientTransport
     from infrastructure.postgres.candle_store import PostgresCandleStore
     from infrastructure.postgres.connection import connect
     from infrastructure.postgres.migration_runner import run_migrations
+    from infrastructure.postgres.session_cache import PostgresSessionCache
 
     logging.basicConfig(
         level=logging.INFO,
@@ -49,11 +50,15 @@ if __name__ == "__main__":
         api_key=_config.api_key,
         identifier=_config.identifier,
         password=_config.password,
+        clock=_clock,
+        max_auth_retries=_config.auth_max_retries,
     )
-    _session = CachedSession(
+    _session = SharedCachedSession(
         inner=_capital_session,
+        cache=PostgresSessionCache(_conn),
         clock=_clock,
         refresh_ttl_seconds=_config.session_refresh_ttl_seconds,
+        owner=True,
     )
     _session.authenticate()
 
@@ -64,13 +69,13 @@ if __name__ == "__main__":
         for s in _config.symbols
     }
     _history = CapitalCandleHistory(
-        session=_capital_session,
+        session=_session,
         http=_http,
         base_url=_config.base_url,
         epic_resolution_map=_period_seconds,
     )
     _ingester = CapitalWsIngester(
-        session=_capital_session,
+        session=_session,
         store=_store,
         history=_history,
         transport=WebsocketClientTransport(),

@@ -40,13 +40,14 @@ if __name__ == "__main__":
 
     load_dotenv()
     from application.reconcile_closed_trades import ReconcileClosedTradesUseCase
-    from infrastructure.capital.cached_session import CachedSession
     from infrastructure.capital.clock import SystemClock
     from infrastructure.capital.history_adapter import CapitalTradeHistory
     from infrastructure.capital.session import CapitalSession
+    from infrastructure.capital.shared_cached_session import SharedCachedSession
     from infrastructure.postgres.connection import connect
     from infrastructure.postgres.journal_adapter import PostgresTradeJournal
     from infrastructure.postgres.migration_runner import run_migrations
+    from infrastructure.postgres.session_cache import PostgresSessionCache
 
     logging.basicConfig(
         level=logging.INFO,
@@ -66,16 +67,20 @@ if __name__ == "__main__":
         api_key=_config.api_key,
         identifier=_config.identifier,
         password=_config.password,
+        clock=_clock,
+        max_auth_retries=_config.auth_max_retries,
     )
-    _session = CachedSession(
+    _session = SharedCachedSession(
         inner=_capital_session,
+        cache=PostgresSessionCache(_conn),
         clock=_clock,
         refresh_ttl_seconds=_config.session_refresh_ttl_seconds,
+        owner=False,
     )
     _session.authenticate()
 
     _journal = PostgresTradeJournal(_conn)
-    _history = CapitalTradeHistory(session=_capital_session, http=_http, base_url=_config.base_url)
+    _history = CapitalTradeHistory(session=_session, http=_http, base_url=_config.base_url)
     _use_case = ReconcileClosedTradesUseCase(_journal, _history)
 
     run_reconciler_forever(

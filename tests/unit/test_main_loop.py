@@ -21,6 +21,7 @@ build_use_cases = _mod.build_use_cases
 from tests.fakes.fake_candle_store import FakeCandleStore
 from tests.fakes.fake_clock import FakeClock
 from tests.fakes.fake_journal import FakeJournalPort
+from tests.fakes.fake_session_cache import FakeSessionCache
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +108,8 @@ def test_build_use_cases_returns_one_per_symbol():
     journal = FakeJournalPort()
 
     use_cases, session = build_use_cases(
-        config, http, clock, journal=journal, candle_store=FakeCandleStore())
+        config, http, clock, journal=journal, candle_store=FakeCandleStore(),
+        session_cache=FakeSessionCache())
 
     assert len(use_cases) == 2
 
@@ -131,7 +133,8 @@ def test_build_use_cases_accepts_warmup_at_strategy_minimum():
     clock = MagicMock()
 
     use_cases, session = build_use_cases(
-        config, http, clock, journal=FakeJournalPort(), candle_store=FakeCandleStore())
+        config, http, clock, journal=FakeJournalPort(), candle_store=FakeCandleStore(),
+        session_cache=FakeSessionCache())
 
     assert use_cases is not None
 

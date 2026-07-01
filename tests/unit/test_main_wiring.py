@@ -19,6 +19,7 @@ build_use_cases = _mod.build_use_cases
 
 from tests.fakes.fake_candle_store import FakeCandleStore
 from tests.fakes.fake_journal import FakeJournalPort
+from tests.fakes.fake_session_cache import FakeSessionCache
 
 
 def _make_config():
@@ -44,7 +45,8 @@ def test_use_case_receives_candle_store_not_broker_candles():
     journal = FakeJournalPort()
 
     store = FakeCandleStore()
-    use_cases, _ = build_use_cases(config, http, clock, journal=journal, candle_store=store)
+    use_cases, _ = build_use_cases(config, http, clock, journal=journal, candle_store=store,
+                                   session_cache=FakeSessionCache())
 
     assert len(use_cases) == 1
     uc = use_cases[0]
