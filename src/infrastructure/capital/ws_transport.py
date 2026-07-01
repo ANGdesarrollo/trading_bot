@@ -23,15 +23,24 @@ class WebsocketClientTransport:
         assert self._ws is not None
         if isinstance(payload, dict):
             payload = json.dumps(payload)
-        self._ws.send(payload)
+        try:
+            self._ws.send(payload)
+        except (websocket.WebSocketException, OSError) as exc:
+            raise ConnectionError(str(exc)) from exc
 
     def recv(self) -> str:
         assert self._ws is not None
-        return self._ws.recv()
+        try:
+            return self._ws.recv()
+        except (websocket.WebSocketException, OSError) as exc:
+            raise ConnectionError(str(exc)) from exc
 
     def ping(self) -> None:
         assert self._ws is not None
-        self._ws.ping()
+        try:
+            self._ws.ping()
+        except (websocket.WebSocketException, OSError) as exc:
+            raise ConnectionError(str(exc)) from exc
 
     def close(self) -> None:
         if self._ws is not None:
