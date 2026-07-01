@@ -296,3 +296,58 @@ def test_config_provider_lowercased():
 def test_blank_provider_raises_value_error():
     with pytest.raises(ValueError, match="PROVIDER"):
         _load_config({**_REQUIRED_ENV, "PROVIDER": "   "})
+
+
+# ---------------------------------------------------------------------------
+# candle-http-api — load_api_config (read-only, no broker credentials)
+# ---------------------------------------------------------------------------
+
+def _load_api_config(env: dict[str, str]):
+    import importlib
+    import sys
+
+    all_relevant = set(env) | {
+        k for k in os.environ
+        if k.startswith(("EPIC_", "SIZE_", "SYMBOLS"))
+        or k in ("DATABASE_URL", "PROVIDER", "CAPITAL_API_KEY", "IDENTIFIER", "PASSWORD")
+    }
+    original = {k: os.environ.get(k) for k in all_relevant}
+    for k in all_relevant:
+        os.environ.pop(k, None)
+    for k, v in env.items():
+        os.environ[k] = v
+    if "config" in sys.modules:
+        del sys.modules["config"]
+    try:
+        from config import load_api_config
+        return load_api_config()
+    finally:
+        for k in all_relevant:
+            original_v = original[k]
+            if original_v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = original_v
+        if "config" in sys.modules:
+            del sys.modules["config"]
+
+
+_API_ENV = {
+    "DATABASE_URL": "postgresql://op:op@localhost/trade_journal",
+    "SYMBOLS": "EURUSD",
+    "EPIC_EURUSD": "CS.D.EURUSD.MINI.IP",
+}
+
+
+def test_api_config_loads_without_broker_credentials():
+    cfg = _load_api_config(_API_ENV)
+    assert cfg.database_url == "postgresql://op:op@localhost/trade_journal"
+    assert cfg.symbols[0].symbol == "EURUSD"
+    assert cfg.symbols[0].epic == "CS.D.EURUSD.MINI.IP"
+    assert cfg.provider == "capital"
+
+
+def test_api_config_missing_database_url_raises():
+    env = {k: v for k, v in _API_ENV.items() if k != "DATABASE_URL"}
+    with pytest.raises(SystemExit, match="DATABASE_URL"):
+        _load_api_config(env)

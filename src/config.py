@@ -32,6 +32,13 @@ class SymbolConfig:
 
 
 @dataclass(frozen=True)
+class ApiConfig:
+    database_url: str
+    symbols: tuple[SymbolConfig, ...]
+    provider: str = "capital"
+
+
+@dataclass(frozen=True)
 class Config:
     mode: str
     base_url: str
@@ -147,5 +154,23 @@ def load_config() -> Config:
         required_candles=warmup_bars,
         backfill_max_candles=backfill_max_candles,
         auth_max_retries=auth_max_retries,
+        provider=provider,
+    )
+
+
+def load_api_config() -> ApiConfig:
+    env = dict(os.environ)
+
+    database_url = env.get("DATABASE_URL", "")
+    if not database_url:
+        raise SystemExit("Missing required environment variables: DATABASE_URL")
+
+    provider = env.get("PROVIDER", "capital").strip().lower()
+    if not provider:
+        raise ValueError("PROVIDER must not be empty when set")
+
+    return ApiConfig(
+        database_url=database_url,
+        symbols=tuple(_parse_symbols(env)),
         provider=provider,
     )
