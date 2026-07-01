@@ -71,16 +71,40 @@ def test_owner_authenticates_and_writes_cache():
     assert stored.streaming_host == "wss://stream-from-inner"
 
 
-def test_owner_reauthenticates_and_rewrites_on_every_call():
-    session, inner, cache, _ = _owner()
+def test_owner_reuses_fresh_cached_token_without_reauth():
+    session, inner, cache, clock = _owner()
 
     session.authenticate()
     session.authenticate()
     session.authenticate()
 
-    assert inner.auth_calls == 3
-    assert cache.store_calls == 3
-    assert cache.load().cst == "cst-3"
+    assert inner.auth_calls == 1
+    assert cache.store_calls == 1
+
+
+def test_owner_reauthenticates_after_ttl():
+    clock = FakeClock(_SEED)
+    session, inner, cache, _ = _owner(clock=clock)
+
+    session.authenticate()
+    clock.advance(541.0)
+    session.authenticate()
+
+    assert inner.auth_calls == 2
+    assert cache.store_calls == 2
+
+
+def test_owner_reuses_token_written_by_a_previous_owner_instance():
+    # A fresh token already in the cache (e.g. written before a restart)
+    # must be reused, not overwritten with a new /session call.
+    cache = FakeSessionCache(_record(_SEED))
+    clock = FakeClock(_SEED)
+    session, inner, _, _ = _owner(cache=cache, clock=clock)
+
+    session.authenticate()
+
+    assert inner.auth_calls == 0
+    assert session.tokens().cst == "cst-shared"
 
 
 def test_reader_never_calls_inner_authenticate():
