@@ -8,18 +8,24 @@ class _HasExecute(Protocol):
     def execute(self) -> None: ...
 
 
+class _HasAuthenticate(Protocol):
+    def authenticate(self) -> None: ...
+
+
 class _HasSleep(Protocol):
     def sleep(self, seconds: float) -> None: ...
 
 
 def run_reconciler_forever(
     use_case: _HasExecute,
+    session: _HasAuthenticate,
     clock: _HasSleep,
     logger: logging.Logger,
 ) -> None:
     while True:
         clock.sleep(60)
         try:
+            session.authenticate()
             use_case.execute()
         except Exception:
             logger.exception("reconciler cycle failed; retrying next boundary")
@@ -27,8 +33,11 @@ def run_reconciler_forever(
 
 if __name__ == "__main__":
     import requests
+    from dotenv import load_dotenv
 
     from config import load_config
+
+    load_dotenv()
     from application.reconcile_closed_trades import ReconcileClosedTradesUseCase
     from infrastructure.capital.clock import SystemClock
     from infrastructure.capital.history_adapter import CapitalTradeHistory
@@ -55,11 +64,10 @@ if __name__ == "__main__":
         identifier=_config.identifier,
         password=_config.password,
     )
-    _session.authenticate()
 
     _journal = PostgresTradeJournal(_conn)
     _history = CapitalTradeHistory(session=_session, http=_http, base_url=_config.base_url)
     _use_case = ReconcileClosedTradesUseCase(_journal, _history)
     _clock = SystemClock()
 
-    run_reconciler_forever(_use_case, _clock, _logger)
+    run_reconciler_forever(_use_case, _session, _clock, _logger)
