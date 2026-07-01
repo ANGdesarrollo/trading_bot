@@ -22,13 +22,13 @@ class FakeCandleStore(CandleStorePort):
         self.upsert_calls: list[CandleRow] = []
 
     def recent_candles(
-        self, provider: str = "capital", *, symbol: str, resolution: str, count: int
+        self, *, provider: str = "capital", symbol: str, resolution: str, count: int
     ) -> Sequence[Candle]:
         self.recent_candles_calls.append((provider, symbol, resolution, count))
         return self._candles
 
     def last_candle_start(
-        self, provider: str = "capital", *, symbol: str, resolution: str
+        self, *, provider: str = "capital", symbol: str, resolution: str
     ) -> datetime | None:
         self.last_candle_start_calls.append((provider, symbol, resolution))
         return self._last_start

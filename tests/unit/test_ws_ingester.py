@@ -407,3 +407,16 @@ def test_reconnect_on_drop_calls_gap_fill_again():
 
     assert len(history.calls) == 2
     assert clock.sleep_calls, "reconnect must sleep with backoff"
+
+
+def test_backfill_records_capital_as_provider():
+    history = FakeHistory([_row(_T_DT)])
+    store = FakeStore(last_start=None)
+    transport = FakeWsTransport([_subscribe_ack()])
+
+    ingester = _make_ingester(transport, store, history, required_candles=1)
+    ingester.run_once()
+
+    assert len(history.calls) == 1
+    provider, *_ = history.calls[0]
+    assert provider == "capital"

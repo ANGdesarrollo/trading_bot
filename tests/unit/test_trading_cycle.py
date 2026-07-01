@@ -131,6 +131,8 @@ def test_stale_store_returns_none_no_retry(caplog):
     assert result is None
     assert clock.sleep_calls == []
     assert len(store.recent_candles_calls) == 1
+    provider, _sym, _res, _count = store.recent_candles_calls[0]
+    assert provider == "capital"
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert any("stale" in m.lower() for m in warnings)
     assert broker.open_position_calls == []
