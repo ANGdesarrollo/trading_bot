@@ -9,7 +9,7 @@ def derive_close_source(
     tp_distance: float,
     direction: str,
 ) -> str:
-    if api_source in ("USER", "CLOSE_OUT"):
+    if api_source in ("USER", "CLOSE_OUT", "TP", "SL"):
         return api_source
     if api_source != "SYSTEM":
         return "USER"

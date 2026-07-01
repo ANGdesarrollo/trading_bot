@@ -18,6 +18,9 @@ _TP_DIST = 0.0040
     ("USER",   "BUY",  9999.0, "USER"),
     ("CLOSE_OUT", "BUY", 9999.0, "CLOSE_OUT"),
     ("SYSTEM", "buy",  1.1040, "TP"),   # mixed-case accepted
+    ("TP", "BUY", 9999.0, "TP"),        # Capital demo gives explicit TP
+    ("SL", "BUY", 9999.0, "SL"),        # Capital demo gives explicit SL
+    ("TP", "SELL", 9999.0, "TP"),       # explicit source ignores price/direction
 ])
 def test_derive_close_source_parametrized(api_source, direction, close_price, expected):
     result = derive_close_source(api_source, close_price, _FP, _SL_DIST, _TP_DIST, direction)

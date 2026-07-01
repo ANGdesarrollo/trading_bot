@@ -6,24 +6,22 @@ from domain.entities.journal import ClosedTrade
 from domain.ports.trade_history_port import TradeHistoryPort
 from infrastructure.capital.session import CapitalSession
 
-
-_ACTIVITY_SOURCE_TO_CLOSE_SOURCE: dict[str, str] = {
-    "USER": "USER",
-    "CLOSE_OUT": "CLOSE_OUT",
-    # Capital.com "SYSTEM" covers both SL and TP; disambiguation happens in the
-    # reconciler via derive_close_source, so the adapter passes the raw value through.
-    "SYSTEM": "SYSTEM",
-}
-
-_CLOSE_SOURCE_FALLBACK = "USER"
-
-
-def _map_close_source(activity_source: str) -> str:
-    return _ACTIVITY_SOURCE_TO_CLOSE_SOURCE.get(activity_source, _CLOSE_SOURCE_FALLBACK)
+_OPEN_SOURCE = "USER"
 
 
 def _to_iso(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    # Capital's /history/activity rejects a trailing 'Z' with error.invalid.from;
+    # it expects a naive-looking ISO timestamp in UTC.
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _direction_sign(direction: str) -> int:
+    d = direction.strip().upper()
+    if d == "BUY":
+        return 1
+    if d == "SELL":
+        return -1
+    raise ValueError(f"invalid direction: {direction!r}")
 
 
 class CapitalTradeHistory(TradeHistoryPort):
@@ -38,43 +36,42 @@ class CapitalTradeHistory(TradeHistoryPort):
             "CST": tokens.cst,
             "X-SECURITY-TOKEN": tokens.security_token,
         }
-        now_iso = _to_iso(datetime.now(timezone.utc))
         from_iso = _to_iso(opened_at)
 
         activity_url = (
             f"{self._base_url}/history/activity"
-            f"?dealId={deal_id}&detailed=true&from={from_iso}&to={now_iso}"
+            f"?dealId={deal_id}&detailed=true&from={from_iso}"
         )
         activity_resp = self._http.get(activity_url, headers=auth_headers)
         activity_resp.raise_for_status()
         activities = activity_resp.json().get("activities", [])
 
-        match = next(
+        close = next(
             (a for a in activities
-             if a.get("dealId") == deal_id and a.get("type") == "POSITION_CLOSED"),
+             if a.get("dealId") == deal_id
+             and a.get("type") == "POSITION"
+             and a.get("source") != _OPEN_SOURCE
+             and "openPrice" in a.get("details", {})),
             None,
         )
-        if match is None:
+        if close is None:
             return None
 
-        tx_url = (
-            f"{self._base_url}/history/transactions"
-            f"?from={from_iso}&to={now_iso}"
-        )
-        tx_resp = self._http.get(tx_url, headers=auth_headers)
-        tx_resp.raise_for_status()
-        transactions = tx_resp.json().get("transactions", [])
+        details = close["details"]
+        open_price = float(details["openPrice"])
+        close_price = float(details["level"])
+        size = float(details["size"])
+        # details.direction is the CLOSING side (opposite of the position);
+        # the position's P&L uses the opening side, so invert it.
+        opening_sign = -_direction_sign(details["direction"])
+        realized_pnl = (close_price - open_price) * size * opening_sign
 
-        tx = next((t for t in transactions if t.get("reference") == deal_id), None)
-        if tx is None:
-            return None
-
-        closed_at = datetime.fromisoformat(match["date"].replace("Z", "+00:00"))
+        closed_at = datetime.fromisoformat(close["date"]).replace(tzinfo=timezone.utc)
         return ClosedTrade(
             deal_id=deal_id,
             closed_at=closed_at,
-            close_price=float(match["level"]),
-            close_source=_map_close_source(match.get("source", "")),
-            realized_pnl=float(tx["profitAndLoss"]),
-            fees=float(tx["commission"]),
+            close_price=close_price,
+            close_source=close.get("source", ""),
+            realized_pnl=realized_pnl,
+            fees=0.0,
         )
