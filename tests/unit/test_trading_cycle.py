@@ -205,8 +205,13 @@ def test_always_stale_skips_boundary(caplog):
     assert len(broker.recent_candles_calls) == 4
     warning_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     expected_boundary_str = str(_EXPECTED_DECISION_TS)
+    received_ts_str = str(_STALE_TS)
     assert any(
-        "stale" in m.lower() and "3" in m and expected_boundary_str in m
+        "stale" in m.lower()
+        and "EURUSD" in m
+        and "3" in m
+        and expected_boundary_str in m
+        and received_ts_str in m
         for m in warning_messages
     )
     assert broker.open_position_calls == []

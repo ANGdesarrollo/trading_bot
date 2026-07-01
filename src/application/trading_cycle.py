@@ -59,8 +59,10 @@ class RunTradingCycleUseCase:
                 self._clock.sleep(self._freshness_retry_seconds)
         else:
             self._logger.warning(
-                "stale candle after %d retries at boundary %s; skipping",
-                self._freshness_max_retries, expected_decision_ts)
+                "stale candle for %s after %d retries at boundary %s; "
+                "expected %s, got %s; skipping",
+                self._symbol, self._freshness_max_retries, expected_decision_ts,
+                expected_decision_ts, candles[-1].timestamp)
             return None
 
         signal = self._strategy.evaluate(candles)
