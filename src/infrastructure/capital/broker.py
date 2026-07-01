@@ -88,7 +88,7 @@ class CapitalBrokerAdapter(BrokerPort):
             )
 
         return OrderResult(
-            order_id=confirm["dealId"],
+            order_id=_opened_position_deal_id(confirm),
             status=deal_status,
             filled_price=float(confirm["level"]),
         )
@@ -115,6 +115,16 @@ class CapitalBrokerAdapter(BrokerPort):
     @staticmethod
     def _auth_headers(tokens) -> dict[str, str]:
         return {"CST": tokens.cst, "X-SECURITY-TOKEN": tokens.security_token}
+
+
+def _opened_position_deal_id(confirm: dict) -> str:
+    # Capital's confirm.dealId is the WORKING_ORDER id; /history/activity filters
+    # by the POSITION id, exposed in affectedDeals with status OPENED. Journaling
+    # the order id makes reconciliation return HTTP 400 forever.
+    for deal in confirm.get("affectedDeals", []):
+        if deal.get("status") == "OPENED":
+            return deal["dealId"]
+    return confirm["dealId"]
 
 
 def _parse_candle(record: dict) -> Candle:

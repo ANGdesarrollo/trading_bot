@@ -124,7 +124,12 @@ def test_open_position_posts_correct_body():
     confirm_resp = CannedResponse(
         status_code=200,
         headers={},
-        json_body={"dealId": "deal-456", "dealStatus": "ACCEPTED", "level": 1.0851},
+        json_body={
+            "dealId": "order-456",
+            "dealStatus": "ACCEPTED",
+            "level": 1.0851,
+            "affectedDeals": [{"dealId": "position-456", "status": "OPENED"}],
+        },
     )
     http = FakeHttp([post_resp, confirm_resp])
     broker = _make_broker(http)
@@ -154,16 +159,56 @@ def test_open_position_returns_order_result_from_confirms():
     confirm_resp = CannedResponse(
         status_code=200,
         headers={},
-        json_body={"dealId": "deal-777", "dealStatus": "OPEN", "level": 1.0849},
+        json_body={
+            "dealId": "order-777",
+            "dealStatus": "OPEN",
+            "level": 1.0849,
+            "affectedDeals": [{"dealId": "position-777", "status": "OPENED"}],
+        },
     )
     http = FakeHttp([post_resp, confirm_resp])
     broker = _make_broker(http)
 
     result = broker.open_position("EURUSD", signal, size=0.05)
 
-    assert result.order_id == "deal-777"
+    assert result.order_id == "position-777"
     assert result.status == "OPEN"
     assert result.filled_price == pytest.approx(1.0849)
+
+
+def test_open_position_order_id_is_opened_affected_deal_not_top_level():
+    """order_id must be the POSITION dealId (affectedDeals OPENED), not the
+    top-level working-order dealId. /history/activity filters by the position
+    dealId; using the order id yields HTTP 400 and the entry never reconciles.
+    """
+    signal = Signal(
+        direction=Direction.BUY,
+        sl_distance=0.0020,
+        tp_distance=0.0020,
+    )
+    post_resp = CannedResponse(
+        status_code=200,
+        headers={},
+        json_body={"dealReference": "ref-affected"},
+    )
+    confirm_resp = CannedResponse(
+        status_code=200,
+        headers={},
+        json_body={
+            "dealId": "00000000-555b-1e6e-0481-70d90055311e",
+            "dealStatus": "ACCEPTED",
+            "level": 0.68925,
+            "affectedDeals": [
+                {"dealId": "00000000-555b-1e71-0481-70d90055311e", "status": "OPENED"},
+            ],
+        },
+    )
+    http = FakeHttp([post_resp, confirm_resp])
+    broker = _make_broker(http)
+
+    result = broker.open_position("EURUSD", signal, size=0.01)
+
+    assert result.order_id == "00000000-555b-1e71-0481-70d90055311e"
 
 
 def test_open_position_rejected_raises_order_rejected_error():
@@ -203,7 +248,12 @@ def test_open_position_sends_stop_distance_not_level():
     confirm_resp = CannedResponse(
         status_code=200,
         headers={},
-        json_body={"dealId": "deal-dist", "dealStatus": "ACCEPTED", "level": 1.0851},
+        json_body={
+            "dealId": "order-dist",
+            "dealStatus": "ACCEPTED",
+            "level": 1.0851,
+            "affectedDeals": [{"dealId": "position-dist", "status": "OPENED"}],
+        },
     )
     http = FakeHttp([post_resp, confirm_resp])
     broker = _make_broker(http)
