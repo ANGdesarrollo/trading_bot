@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import random
 
 from domain.entities.candle_row import CandleRow
 from domain.ports.candle_history_port import CandleHistoryPort
@@ -12,15 +11,9 @@ from infrastructure.capital.session import CapitalSession
 
 _log = logging.getLogger(__name__)
 
-_BACKOFF_BASE_S = 1.0
-_BACKOFF_CAP_S = 60.0
+_RECONNECT_DELAY_S = 2.0
 
 _OHLC_EVENT = "ohlc.event"
-
-
-def _full_jitter(attempt: int) -> float:
-    ceiling = min(_BACKOFF_CAP_S, _BACKOFF_BASE_S * (2 ** attempt))
-    return random.uniform(0, ceiling)
 
 
 class CapitalWsIngester:
@@ -31,12 +24,8 @@ class CapitalWsIngester:
     websocket-client.
 
     `run_once()` handles one connection lifecycle: connect, subscribe,
-    backfill/gap-fill, process events until StopIteration or ConnectionError.
-    On ConnectionError it reconnects up to `max_reconnect_attempts` times with
-    exponential + full-jitter backoff.
-
-    For a long-running process, call `run_once()` inside an outer retry loop
-    (ingestion.py provides that loop).
+    backfill/gap-fill, process events. On ConnectionError it reconnects
+    after a fixed short delay, indefinitely.
     """
 
     def __init__(
@@ -51,7 +40,6 @@ class CapitalWsIngester:
         period_seconds: dict[tuple[str, str], int],
         ws_ping_interval_seconds: int,
         required_candles: int,
-        max_reconnect_attempts: int = 0,
         provider: str = "capital",
     ) -> None:
         self._session = session
@@ -64,11 +52,9 @@ class CapitalWsIngester:
         self._period_seconds = period_seconds
         self._ping_interval = ws_ping_interval_seconds
         self._required_candles = required_candles
-        self._max_reconnect_attempts = max_reconnect_attempts
         self._provider = provider
 
     def run_once(self) -> None:
-        attempts = 0
         while True:
             try:
                 self._connect_and_process()
@@ -76,13 +62,8 @@ class CapitalWsIngester:
             except StopIteration:
                 return
             except ConnectionError as exc:
-                if self._max_reconnect_attempts > 0 and attempts >= self._max_reconnect_attempts:
-                    _log.error("max reconnect attempts reached: %s", exc)
-                    return
-                delay = _full_jitter(attempts)
-                _log.warning("WS dropped, reconnecting in %.1fs: %s", delay, exc)
-                self._clock.sleep(delay)
-                attempts += 1
+                _log.warning("WS dropped, reconnecting in %.1fs: %s", _RECONNECT_DELAY_S, exc)
+                self._clock.sleep(_RECONNECT_DELAY_S)
 
     def _connect_and_process(self) -> None:
         url = f"{self._session.streaming_host}/connect"

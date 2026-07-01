@@ -442,13 +442,12 @@ def test_reconnect_on_drop_calls_gap_fill_again():
         period_seconds={(_EPIC, _RES): _PERIOD_S},
         ws_ping_interval_seconds=540,
         required_candles=1,
-        max_reconnect_attempts=1,
     )
 
     ingester.run_once()
 
     assert len(history.calls) == 2
-    assert clock.sleep_calls, "reconnect must sleep with backoff"
+    assert clock.sleep_calls, "reconnect must sleep before retrying"
 
 
 def test_backfill_records_capital_as_provider():
