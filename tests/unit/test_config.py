@@ -291,3 +291,8 @@ def test_config_provider_reads_from_env():
 def test_config_provider_lowercased():
     cfg = _load_config({**_REQUIRED_ENV, "PROVIDER": "IC_MARKETS"})
     assert cfg.provider == "ic_markets"
+
+
+def test_blank_provider_raises_value_error():
+    with pytest.raises(ValueError, match="PROVIDER"):
+        _load_config({**_REQUIRED_ENV, "PROVIDER": "   "})

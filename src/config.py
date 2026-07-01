@@ -106,7 +106,9 @@ def load_config() -> Config:
     ws_ping_interval_seconds = int(env.get("WS_PING_INTERVAL_SECONDS", "540"))
     backfill_max_candles = int(env.get("BACKFILL_MAX_CANDLES", "500"))
     auth_max_retries = int(env.get("AUTH_MAX_RETRIES", "5"))
-    provider = env.get("PROVIDER", "capital").lower()
+    provider = env.get("PROVIDER", "capital").strip().lower()
+    if not provider:
+        raise ValueError("PROVIDER must not be empty when set")
 
     if ws_ping_interval_seconds >= _WS_PING_MAX_SECONDS:
         raise ValueError(
