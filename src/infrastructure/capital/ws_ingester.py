@@ -68,6 +68,7 @@ class CapitalWsIngester:
                 self._clock.sleep(_RECONNECT_DELAY_S)
 
     def _connect_and_process(self) -> None:
+        self._session.authenticate()
         url = f"{self._session.streaming_host}/connect"
         self._transport.connect(url)
         connected_at = self._clock.utcnow()
