@@ -18,6 +18,7 @@ class JournalEntry:
     position_size: float
     bid_at_decision: float | None
     ask_at_decision: float | None
+    provider: str = "capital"
 
 
 @dataclass(frozen=True, slots=True)

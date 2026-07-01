@@ -44,6 +44,22 @@ def test_journal_entry_is_immutable():
         entry.deal_id = "X"
 
 
+def test_journal_entry_has_provider_field_defaulting_to_capital():
+    entry = _make_entry()
+    assert entry.provider == "capital"
+
+
+def test_journal_entry_provider_override():
+    entry = _make_entry(provider="ic_markets")
+    assert entry.provider == "ic_markets"
+
+
+def test_journal_entry_provider_is_immutable():
+    entry = _make_entry()
+    with pytest.raises((AttributeError, TypeError)):
+        entry.provider = "ic_markets"  # type: ignore[misc]
+
+
 def test_journal_result_close_source_values():
     for src in ("SL", "TP", "USER", "CLOSE_OUT"):
         r = JournalResult(
