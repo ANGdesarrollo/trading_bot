@@ -11,8 +11,8 @@ class CandleHistoryPort(ABC):
     @abstractmethod
     def fetch_history(
         self,
-        provider: str = "capital",
         *,
+        provider: str = "capital",
         epic: str,
         resolution: str,
         count: int,

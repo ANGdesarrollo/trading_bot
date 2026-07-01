@@ -26,9 +26,9 @@ def test_fetch_history_signature_accepts_four_params():
     assert "since" in params
 
 
-def test_fetch_history_has_provider_as_first_param_with_default():
+def test_fetch_history_provider_is_keyword_only_with_default():
     from domain.ports.candle_history_port import CandleHistoryPort
     sig = inspect.signature(CandleHistoryPort.fetch_history)
-    params = list(sig.parameters)
-    assert params[1] == "provider", f"expected 'provider' first, got {params[1:]}"
-    assert sig.parameters["provider"].default == "capital"
+    p = sig.parameters["provider"]
+    assert p.kind == inspect.Parameter.KEYWORD_ONLY, "provider must be keyword-only"
+    assert p.default == "capital"

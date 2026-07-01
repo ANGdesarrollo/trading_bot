@@ -11,13 +11,13 @@ from domain.entities.candle_row import CandleRow
 class CandleStorePort(ABC):
     @abstractmethod
     def recent_candles(
-        self, provider: str = "capital", *, symbol: str, resolution: str, count: int
+        self, *, provider: str = "capital", symbol: str, resolution: str, count: int
     ) -> Sequence[Candle]:
         """Return up to `count` most-recent closed candles for (provider, symbol, resolution), oldest-first, OHLC as mid=(bid+ask)/2."""
 
     @abstractmethod
     def last_candle_start(
-        self, provider: str = "capital", *, symbol: str, resolution: str
+        self, *, provider: str = "capital", symbol: str, resolution: str
     ) -> datetime | None:
         """Return candle_start of the most recent row for (provider, symbol, resolution), or None."""
 

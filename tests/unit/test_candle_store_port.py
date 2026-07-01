@@ -18,20 +18,20 @@ def test_candle_store_port_declares_three_abstract_methods():
     assert hasattr(CandleStorePort, "upsert_candle")
 
 
-def test_recent_candles_has_provider_as_first_param_with_default():
+def test_recent_candles_provider_is_keyword_only_with_default():
     from domain.ports.candle_store_port import CandleStorePort
     sig = inspect.signature(CandleStorePort.recent_candles)
-    params = list(sig.parameters)
-    assert params[1] == "provider", f"expected 'provider' first, got {params[1:]}"
-    assert sig.parameters["provider"].default == "capital"
+    p = sig.parameters["provider"]
+    assert p.kind == inspect.Parameter.KEYWORD_ONLY, "provider must be keyword-only"
+    assert p.default == "capital"
 
 
-def test_last_candle_start_has_provider_as_first_param_with_default():
+def test_last_candle_start_provider_is_keyword_only_with_default():
     from domain.ports.candle_store_port import CandleStorePort
     sig = inspect.signature(CandleStorePort.last_candle_start)
-    params = list(sig.parameters)
-    assert params[1] == "provider", f"expected 'provider' first, got {params[1:]}"
-    assert sig.parameters["provider"].default == "capital"
+    p = sig.parameters["provider"]
+    assert p.kind == inspect.Parameter.KEYWORD_ONLY, "provider must be keyword-only"
+    assert p.default == "capital"
 
 
 def test_candle_store_port_has_no_infra_imports():
