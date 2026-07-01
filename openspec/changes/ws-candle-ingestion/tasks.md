@@ -78,36 +78,36 @@ Chain strategy: stacked-to-main
 
 ### Phase 6: CapitalSession streaming_host
 
-- [ ] 2.1 **RED** `tests/unit/test_capital_session.py` (modify existing) — assert `streaming_host` raises `RuntimeError` before `authenticate()`; assert after `authenticate()` with fake HTTP body `{"streamingHost": "https://streaming.capital.com"}`, property returns that URL; assert `authenticate()` still returns `SessionTokens` with correct tokens. (AC-CS-1, AC-CS-2, AC-CS-3, AC-CS-4)
-- [ ] 2.2 **GREEN** Modify `src/infrastructure/capital/session.py` — after extracting headers in `authenticate()`, parse `response.json()` and store `self._streaming_host = body.get("streamingHost")`; add `@property streaming_host` raising `RuntimeError("Not authenticated")` when `_streaming_host is None`. Make 2.1 pass.
+- [x] 2.1 **RED** `tests/unit/test_capital_session.py` (modify existing) — assert `streaming_host` raises `RuntimeError` before `authenticate()`; assert after `authenticate()` with fake HTTP body `{"streamingHost": "https://streaming.capital.com"}`, property returns that URL; assert `authenticate()` still returns `SessionTokens` with correct tokens. (AC-CS-1, AC-CS-2, AC-CS-3, AC-CS-4)
+- [x] 2.2 **GREEN** Modify `src/infrastructure/capital/session.py` — after extracting headers in `authenticate()`, parse `response.json()` and store `self._streaming_host = body.get("streamingHost")`; add `@property streaming_host` raising `RuntimeError("Not authenticated")` when `_streaming_host is None`. Make 2.1 pass.
 
 ### Phase 7: CandleHistoryPort adapter
 
-- [ ] 2.3 **RED** `tests/unit/test_capital_candle_history.py` — with fake `requests.Session` returning a canned `/prices` response: assert `fetch_history(epic, resolution, count=3, since=None)` calls `/prices` with correct params and returns 3 `CandleRow` objects with correct epic/resolution/candle_start/bid/ask fields. Addresses probe-(a) by testing both param shapes (max-only path).
-- [ ] 2.4 **RED** (same file) — `fetch_history(epic, resolution, count=5, since=T_last)` calls `/prices` with range params (probe-a: note in test that `from`/`to` path may need adjustment after real API capture).
-- [ ] 2.5 **GREEN** Create `src/infrastructure/capital/candle_history.py` — `CapitalCandleHistory` implements `CandleHistoryPort`; uses `/prices` endpoint; handles both cold (`max=count`) and gap (`from`/`to`) call shapes; returns `Sequence[CandleRow]`. Make 2.3–2.4 pass.
+- [x] 2.3 **RED** `tests/unit/test_capital_candle_history.py` — with fake `requests.Session` returning a canned `/prices` response: assert `fetch_history(epic, resolution, count=3, since=None)` calls `/prices` with correct params and returns 3 `CandleRow` objects with correct epic/resolution/candle_start/bid/ask fields. Addresses probe-(a) by testing both param shapes (max-only path).
+- [x] 2.4 **RED** (same file) — `fetch_history(epic, resolution, count=5, since=T_last)` calls `/prices` with range params (probe-a: note in test that `from`/`to` path may need adjustment after real API capture).
+- [x] 2.5 **GREEN** Create `src/infrastructure/capital/candle_history.py` — `CapitalCandleHistory` implements `CandleHistoryPort`; uses `/prices` endpoint; handles both cold (`max=count`) and gap (`from`/`to`) call shapes; returns `Sequence[CandleRow]`. Make 2.3–2.4 pass.
 
 ### Phase 8: PairBuffer (unit)
 
-- [ ] 2.6 **RED** `tests/unit/test_pair_buffer.py` — assert bid-only event: `upsert_candle` NOT called; bid+ask same key: called exactly once with correct `CandleRow`; ask-first then bid: same; two epics, only matched epic writes. (AC-WCI-1, AC-WCI-2, AC-WCI-3, AC-WCI-4)
-- [ ] 2.7 **RED** (same file) — assert epoch-ms conversion: `t=1_700_000_000_000` → `candle_start == datetime(2023, 11, 14, 22, 13, 20, tz=utc)`. (AC-WCI-8)
-- [ ] 2.8 **RED** (same file) — staleness eviction: partial with `t_ms < newest - 4*period_ms` is dropped on next event; no upsert for the evicted partial.
-- [ ] 2.9 **GREEN** Create `src/infrastructure/capital/_pair_buffer.py` — `PairBuffer` class; internal `dict[(epic,resolution,t_ms), _Partial]`; `on_event(msg, upsert_fn)` method; eviction on each call; `candle_start = datetime.fromtimestamp(t/1000, tz=utc)`. Make 2.6–2.8 pass.
-- [ ] 2.10 **REFACTOR** Extract `_Partial` as a `dataclass(slots=True)` if not already; keep `PairBuffer` at single responsibility.
+- [x] 2.6 **RED** `tests/unit/test_pair_buffer.py` — assert bid-only event: `upsert_candle` NOT called; bid+ask same key: called exactly once with correct `CandleRow`; ask-first then bid: same; two epics, only matched epic writes. (AC-WCI-1, AC-WCI-2, AC-WCI-3, AC-WCI-4)
+- [x] 2.7 **RED** (same file) — assert epoch-ms conversion: `t=1_700_000_000_000` → `candle_start == datetime(2023, 11, 14, 22, 13, 20, tz=utc)`. (AC-WCI-8)
+- [x] 2.8 **RED** (same file) — staleness eviction: partial with `t_ms < newest - 4*period_ms` is dropped on next event; no upsert for the evicted partial.
+- [x] 2.9 **GREEN** Create `src/infrastructure/capital/_pair_buffer.py` — `PairBuffer` class; internal `dict[(epic,resolution,t_ms), _Partial]`; `on_event(msg, upsert_fn)` method; eviction on each call; `candle_start = datetime.fromtimestamp(t/1000, tz=utc)`. Make 2.6–2.8 pass.
+- [x] 2.10 **REFACTOR** Extract `_Partial` as a `dataclass(slots=True)` if not already; keep `PairBuffer` at single responsibility.
 
 ### Phase 9: CapitalWsIngester (unit with fakes)
 
-- [ ] 2.11 **RED** `tests/unit/test_ws_ingester.py` — cold-start: fake `last_candle_start` returns `None`; assert `fetch_history` called with `count=required_candles, since=None`; upsert called for each returned row; buffered events drained after backfill. (AC-WCI-5)
-- [ ] 2.12 **RED** (same file) — warm-start: fake `last_candle_start` returns `T_last`; assert `fetch_history` called with `since=T_last+1_period`; no full-history request. (AC-WCI-6)
-- [ ] 2.13 **RED** (same file) — reconnect: fake transport raises `ConnectionError` on second `recv()`; assert exp-backoff sleep schedule called (1s..60s jitter, fake clock); re-subscribe + gap-fill re-run before resuming. (WCI-08)
-- [ ] 2.14 **RED** (same file) — ping: after `ws_ping_interval_seconds` elapses on fake clock, assert `ws.ping()` called (WCI-07).
-- [ ] 2.15 **GREEN** Create `src/infrastructure/capital/ws_ingester.py` — `CapitalWsIngester`; deps: `CandleStorePort`, `CandleHistoryPort`, `CapitalSession`, `Config`; startup sequence (connect+subscribe → buffer → backfill/gap → drain → live); `PairBuffer` delegation; ping timer; reconnect with exp-backoff (base 1s, cap 60s, full jitter, unbounded). Make 2.11–2.14 pass.
-- [ ] 2.16 **REFACTOR** Extract `_backfill_or_gap_fill(epic)` private method used both at startup and after reconnect (DRY — WCI-02 vs WCI-08 share the same logic).
+- [x] 2.11 **RED** `tests/unit/test_ws_ingester.py` — cold-start: fake `last_candle_start` returns `None`; assert `fetch_history` called with `count=required_candles, since=None`; upsert called for each returned row; buffered events drained after backfill. (AC-WCI-5)
+- [x] 2.12 **RED** (same file) — warm-start: fake `last_candle_start` returns `T_last`; assert `fetch_history` called with `since=T_last+1_period`; no full-history request. (AC-WCI-6)
+- [x] 2.13 **RED** (same file) — reconnect: fake transport raises `ConnectionError` on second `recv()`; assert exp-backoff sleep schedule called (1s..60s jitter, fake clock); re-subscribe + gap-fill re-run before resuming. (WCI-08)
+- [x] 2.14 **RED** (same file) — ping: after `ws_ping_interval_seconds` elapses on fake clock, assert `ws.ping()` called (WCI-07).
+- [x] 2.15 **GREEN** Create `src/infrastructure/capital/ws_ingester.py` — `CapitalWsIngester`; deps: `CandleStorePort`, `CandleHistoryPort`, `CapitalSession`, `Config`; startup sequence (connect+subscribe → buffer → backfill/gap → drain → live); `PairBuffer` delegation; ping timer; reconnect with exp-backoff (base 1s, cap 60s, full jitter, unbounded). Make 2.11–2.14 pass.
+- [x] 2.16 **REFACTOR** Extract `_backfill_or_gap_fill(epic)` private method used both at startup and after reconnect (DRY — WCI-02 vs WCI-08 share the same logic).
 
 ### Phase 10: Ingestion entry point
 
-- [ ] 2.17 **RED** `tests/unit/test_ingestion.py` — assert `run_ingestion_forever(ingester)` calls `ingester.start()` and loops; verify it is independently callable (structural test, not integration).
-- [ ] 2.18 **GREEN** Create `src/ingestion.py` — mirrors `src/reconciler.py`; `run_ingestion_forever(ingester)` blocking loop; `if __name__ == "__main__"` guard (WCI-09). Make 2.17 pass.
+- [x] 2.17 **RED** `tests/unit/test_ingestion.py` — assert `run_ingestion_forever(ingester)` calls `ingester.run_once()` and loops; verify it is independently callable (structural test, not integration).
+- [x] 2.18 **GREEN** Create `src/ingestion.py` — mirrors `src/reconciler.py`; `run_ingestion_forever(ingester)` blocking loop; `if __name__ == "__main__"` guard (WCI-09). Make 2.17 pass.
 
 > **Slice 2 exit gate**: `cd operator && .venv/bin/python3 -m pytest` passes; `CapitalWsIngester` tested via fakes; `CapitalSession.streaming_host` green; ingestion entry point runnable.
 
@@ -117,25 +117,25 @@ Chain strategy: stacked-to-main
 
 ### Phase 11: Remove BrokerPort.recent_candles
 
-- [ ] 3.1 **RED** `tests/unit/test_broker_port.py` (create or modify) — assert `BrokerPort` has NO `recent_candles` method; assert only `open_position` and `has_open_position` remain as abstract methods. (CSP-08)
-- [ ] 3.2 **GREEN** Modify `src/domain/ports/broker_port.py` — remove `recent_candles` abstract method.
-- [ ] 3.3 **GREEN** Modify `src/infrastructure/capital/broker.py` — remove `recent_candles` and `_parse_candle`.
-- [ ] 3.4 **GREEN** Modify `tests/fakes/fake_broker.py` — remove `recent_candles`, `recent_candles_calls`, and `candles` constructor param; keep only `has_open_position` + `open_position`. Make 3.1 pass.
+- [x] 3.1 **RED** `tests/unit/test_ports_are_abstract.py` (modify) — added `test_broker_port_has_no_recent_candles` and `test_broker_port_declares_only_order_methods`. RED confirmed.
+- [x] 3.2 **GREEN** Modify `src/domain/ports/broker_port.py` — removed `recent_candles` abstract method and `Candle`/`Sequence` imports.
+- [x] 3.3 **GREEN** Modify `src/infrastructure/capital/broker.py` — removed `recent_candles`, `_parse_candle`, `Candle`/`Sequence`/`datetime`/`timezone` imports.
+- [x] 3.4 **GREEN** Modify `tests/fakes/fake_broker.py` — removed `recent_candles`, `recent_candles_calls`, `candles` param; removed `Candle`/`Sequence` imports. 3.1 now passes.
 
 ### Phase 12: RunTradingCycleUseCase cutover
 
-- [ ] 3.5 **RED** `tests/unit/test_trading_cycle.py` (modify) — delete freshness-1/2/3 tests; add `test_short_store_returns_none` (AC-TC-1); add `test_stale_store_returns_none_no_retry` (AC-TC-2); add `test_fresh_full_store_calls_strategy_and_broker` (AC-TC-3); add `test_no_retry_params_in_constructor` introspecting `__init__` signature (AC-TC-4); confirm `test_open_position_skips_cycle` still passes (AC-TC-5); use new `FakeCandleStore`.
-- [ ] 3.6 **GREEN** Create `tests/fakes/fake_candle_store.py` — `FakeCandleStore(CandleStorePort)` with injectable `candles` list and `last_start` value; records `recent_candles_calls`.
-- [ ] 3.7 **GREEN** Modify `src/application/trading_cycle.py` — replace `broker` candle source with `candle_store: CandleStorePort` constructor param; remove `freshness_max_retries`/`freshness_retry_seconds`; implement single staleness check (`candles[-1].timestamp != expected → warn + None`); startup-race guard (`len < required → None`). Make 3.5 pass.
+- [x] 3.5 **RED** `tests/unit/test_trading_cycle.py` (rewrite) — deleted freshness-1/2/3 tests; added AC-TC-1..5 + journal tests using FakeCandleStore. 9 tests RED confirmed.
+- [x] 3.6 **GREEN** Create `tests/fakes/fake_candle_store.py` — `FakeCandleStore(CandleStorePort)` with injectable `candles` list and `last_start`; records `recent_candles_calls` and `upsert_calls`.
+- [x] 3.7 **GREEN** Modify `src/application/trading_cycle.py` — replaced broker candle source with `candle_store: CandleStorePort`; removed freshness params; single staleness check (warn+None); startup-race guard (len < required → None). All 9 tests GREEN.
 
 ### Phase 13: __main__ wiring + startup-race guard
 
-- [ ] 3.8 **RED** `tests/unit/test_main_wiring.py` (create or modify) — assert `RunTradingCycleUseCase` is constructed with a `CandleStorePort` arg, not `broker.recent_candles`; `startup_required` param absent or `None`.
-- [ ] 3.9 **GREEN** Modify `src/__main__.py` — build `PostgresCandleStore(conn)`; pass `candle_store=store` to `RunTradingCycleUseCase`; remove any broker-candle wiring; `ingestion.py` is a separate process — no wiring here. Make 3.8 pass.
+- [x] 3.8 **RED** Create `tests/unit/test_main_wiring.py` — asserts `uc._candle_store is store` and `_freshness_max_retries` absent. RED confirmed (build_use_cases passed freshness_ args).
+- [x] 3.9 **GREEN** Modify `src/__main__.py` — added `PostgresCandleStore` import; built `candle_store` from same `conn`; added `candle_store=None` param (test seam); removed `freshness_*` args. Also updated `test_main_loop.py` and `test_capital_broker.py`. 3.8 GREEN.
 
 ### Phase 14: Final suite clean-up
 
-- [ ] 3.10 Verify full suite green: `cd operator && .venv/bin/python3 -m pytest`; confirm zero references to `BrokerPort.recent_candles`, `freshness_max_retries`, or `freshness_retry_seconds` remain in source or tests.
+- [x] 3.10 Full suite: 187 passed, 18 skipped. Zero references to `BrokerPort.recent_candles`, `freshness_max_retries`, or `freshness_retry_seconds` in source. Grep-clean confirmed.
 - [ ] 3.11 **Integration smoke** (optional if DATABASE_URL available): run `tests/integration/test_postgres_candle_store.py` + `tests/integration/test_candle_migration.py` against real PG to confirm AC-WCI-7 (idempotent overlap from live event after backfill).
 
 > **Slice 3 exit gate**: `cd operator && .venv/bin/python3 -m pytest` passes; `RunTradingCycleUseCase` has no freshness params; `BrokerPort` has no `recent_candles`; all AC-TC-* and AC-CSP-* green.
