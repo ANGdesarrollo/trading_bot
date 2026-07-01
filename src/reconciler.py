@@ -74,7 +74,6 @@ if __name__ == "__main__":
         inner=_capital_session,
         cache=PostgresSessionCache(_conn),
         clock=_clock,
-        refresh_ttl_seconds=_config.session_refresh_ttl_seconds,
         owner=False,
     )
     _session.authenticate()

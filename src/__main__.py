@@ -84,7 +84,6 @@ def build_use_cases(
         inner=capital_session,
         cache=session_cache,
         clock=clock,
-        refresh_ttl_seconds=config.session_refresh_ttl_seconds,
         owner=False,
     )
     broker = CapitalBrokerAdapter(

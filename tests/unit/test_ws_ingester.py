@@ -178,6 +178,11 @@ class FakeClock:
 class FakeSession:
     def __init__(self) -> None:
         self._streaming_host = _BASE_WS
+        self.authenticate_calls = 0
+
+    def authenticate(self):
+        self.authenticate_calls += 1
+        return self.tokens()
 
     @property
     def streaming_host(self) -> str:
@@ -347,6 +352,41 @@ def test_ping_sent_after_ping_interval():
     ingester.run_once()
 
     assert transport.ping_count >= 1
+
+
+def test_session_reauthenticated_on_refresh_tick():
+    store = FakeStore()
+    history = FakeHistory()
+    clock = FakeClock()
+    session = FakeSession()
+
+    class AdvancingTransport(FakeWsTransport):
+        def __init__(self, msgs, clk, advance_s=0):
+            super().__init__(msgs)
+            self._clk = clk
+            self._advance_s = advance_s
+
+        def recv(self):
+            self._clk.advance(self._advance_s)
+            return super().recv()
+
+    transport = AdvancingTransport([_subscribe_ack()], clock, advance_s=6)
+
+    ingester = CapitalWsIngester(
+        session=session,
+        store=store,
+        history=history,
+        transport=transport,
+        clock=clock,
+        epics=[_EPIC],
+        resolution=_RES,
+        period_seconds={(_EPIC, _RES): _PERIOD_S},
+        ws_ping_interval_seconds=5,
+        required_candles=1,
+    )
+    ingester.run_once()
+
+    assert session.authenticate_calls >= 1
 
 
 def test_reconnect_on_drop_calls_gap_fill_again():

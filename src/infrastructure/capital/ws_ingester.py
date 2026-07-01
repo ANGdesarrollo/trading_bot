@@ -144,6 +144,7 @@ class CapitalWsIngester:
             elapsed = (now - last_ping).total_seconds()
             if elapsed >= self._ping_interval:
                 self._transport.ping()
+                self._session.authenticate()
                 last_ping = now
 
             raw = self._transport.recv()
