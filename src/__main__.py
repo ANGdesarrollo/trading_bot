@@ -1,0 +1,104 @@
+"""Trading engine entry point — composition root and 15-minute aligned loop.
+
+This is the ONLY place concrete infrastructure classes are instantiated and
+wired together. Everything else depends on abstractions (ports).
+
+Usage:
+    uv run python -m trading_engine   # or: cd src && python __main__.py
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+
+import requests
+
+from config import load_config
+from application.trading_cycle import RunTradingCycleUseCase
+from domain.adapters.fade_strategy import FadeStrategy
+from domain.ports.trade_journal_port import TradeJournalPort
+from infrastructure.capital.broker import CapitalBrokerAdapter
+from infrastructure.capital.clock import SystemClock
+from infrastructure.capital.session import CapitalSession
+from infrastructure.postgres.connection import connect
+from infrastructure.postgres.journal_adapter import PostgresTradeJournal
+from infrastructure.postgres.migration_runner import run_migrations
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("trading_engine")
+
+
+def seconds_until_next_boundary(now: datetime, period_minutes: int) -> float:
+    """Seconds until the next multiple-of-period-minutes UTC boundary.
+
+    When `now` falls exactly on a boundary, returns a full period so the
+    loop always moves forward rather than spinning.
+    """
+    period = period_minutes * 60
+    epoch_secs = now.timestamp()
+    remainder = epoch_secs % period
+    wait = period - remainder
+    return float(wait)
+
+
+def build_use_case(config, http, clock, journal: TradeJournalPort | None = None):
+    session = CapitalSession(
+        http=http,
+        base_url=config.base_url,
+        api_key=config.api_key,
+        identifier=config.identifier,
+        password=config.password,
+    )
+    broker = CapitalBrokerAdapter(
+        session=session,
+        http=http,
+        base_url=config.base_url,
+        epics=config.epics,
+        timeframe=config.timeframe,
+    )
+    strategy = FadeStrategy()
+    if config.warmup_bars < strategy.required_candles:
+        raise SystemExit(
+            f"warmup_bars={config.warmup_bars} < strategy requirement "
+            f"{strategy.required_candles}"
+        )
+    if journal is None:
+        conn = connect(config.database_url)
+        run_migrations(conn)
+        journal = PostgresTradeJournal(conn)
+    use_case = RunTradingCycleUseCase(
+        broker=broker,
+        strategy=strategy,
+        symbol=config.symbol,
+        size=config.trade_size,
+        logger=logger,
+        clock=clock,
+        poll_minutes=config.poll_minutes,
+        freshness_max_retries=config.freshness_max_retries,
+        freshness_retry_seconds=config.freshness_retry_seconds,
+        journal=journal,
+    )
+    return use_case, session
+
+
+def run_forever(config, use_case, session, clock) -> None:
+    while True:
+        wait = seconds_until_next_boundary(clock.utcnow(), config.poll_minutes)
+        clock.sleep(wait + config.candle_settle_seconds)
+        try:
+            session.authenticate()
+            use_case.execute()
+        except Exception:
+            logger.exception("cycle failed; continuing to next boundary")
+
+
+if __name__ == "__main__":
+    config = load_config()
+    http = requests.Session()
+    clock = SystemClock()
+    use_case, session = build_use_case(config, http, clock)
+    run_forever(config, use_case, session, clock)

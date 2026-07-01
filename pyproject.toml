@@ -1,0 +1,24 @@
+[project]
+name = "trading-engine"
+version = "0.1.0"
+description = "Hexagonal trading engine running validated strategies against pluggable broker providers"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "requests",
+    "python-dotenv",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
