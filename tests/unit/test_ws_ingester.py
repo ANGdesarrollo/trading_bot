@@ -365,7 +365,7 @@ def test_ping_sent_after_ping_interval():
     )
     ingester.run_once()
 
-    assert transport.ping_count >= 1
+    assert any(f.get("destination") == "ping" for f in transport.sent)
 
 
 def test_session_reauthenticated_on_refresh_tick():

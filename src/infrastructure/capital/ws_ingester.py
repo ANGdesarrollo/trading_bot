@@ -12,7 +12,7 @@ from infrastructure.capital.ws_transport import RecvTimeout
 
 _log = logging.getLogger(__name__)
 
-_RECONNECT_DELAY_S = 2.0
+_RECONNECT_DELAY_S = 0.5
 _TOKEN_REFRESH_S = 540.0
 
 _OHLC_EVENT = "ohlc.event"
@@ -93,6 +93,16 @@ class CapitalWsIngester:
         }
         self._transport.send(json.dumps(frame))
 
+    def _send_ping(self) -> None:
+        tokens = self._session.tokens()
+        frame = {
+            "destination": "ping",
+            "correlationId": "ingester-ping",
+            "cst": tokens.cst,
+            "securityToken": tokens.security_token,
+        }
+        self._transport.send(json.dumps(frame))
+
     def _backfill_or_gap_fill(self) -> None:
         for epic in self._epics:
             last = self._store.last_candle_start(
@@ -131,7 +141,7 @@ class CapitalWsIngester:
         while True:
             now = self._clock.utcnow()
             if (now - last_ping).total_seconds() >= self._ping_interval:
-                self._transport.ping()
+                self._send_ping()
                 last_ping = now
             if (now - last_auth).total_seconds() >= _TOKEN_REFRESH_S:
                 self._session.authenticate()
@@ -143,4 +153,8 @@ class CapitalWsIngester:
                 continue
             msg = json.loads(raw)
             if msg.get("destination") == _OHLC_EVENT:
-                pair_buffer.on_event(msg, self._store.upsert_candle)
+                pair_buffer.on_event(msg, self._store_and_log)
+
+    def _store_and_log(self, row: CandleRow) -> None:
+        _log.info("persisting candle epic=%s start=%s", row.epic, row.candle_start)
+        self._store.upsert_candle(row)
