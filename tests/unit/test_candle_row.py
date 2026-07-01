@@ -21,8 +21,9 @@ def _make_row(**overrides):
     return CandleRow(**{**defaults, **overrides})
 
 
-def test_candle_row_has_all_eleven_fields():
+def test_candle_row_has_all_twelve_fields():
     row = _make_row()
+    assert row.provider == "capital"
     assert row.epic == "EURUSD"
     assert row.resolution == "MINUTE_15"
     assert row.candle_start == _UTC_TS
@@ -34,6 +35,22 @@ def test_candle_row_has_all_eleven_fields():
     assert row.high_ask == 1.091
     assert row.low_ask == 1.071
     assert row.close_ask == 1.086
+
+
+def test_candle_row_provider_defaults_to_capital():
+    row = _make_row()
+    assert row.provider == "capital"
+
+
+def test_candle_row_provider_override():
+    row = _make_row(provider="ic_markets")
+    assert row.provider == "ic_markets"
+
+
+def test_candle_row_provider_is_first_field():
+    from domain.entities.candle_row import CandleRow
+    fields = [f.name for f in dataclasses.fields(CandleRow)]
+    assert fields[0] == "provider"
 
 
 def test_candle_row_is_frozen():
