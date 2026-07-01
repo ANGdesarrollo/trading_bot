@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 
 from domain.entities.candle import Candle
 from domain.entities.candle_row import CandleRow
@@ -46,7 +46,7 @@ LIMIT 1
 def _row_to_candle(row: tuple) -> Candle:
     ts, ob, hb, lb, cb, oa, ha, la, ca = row
     return Candle(
-        timestamp=ts,
+        timestamp=ts.astimezone(timezone.utc),
         open=float((ob + oa) / 2),
         high=float((hb + ha) / 2),
         low=float((lb + la) / 2),

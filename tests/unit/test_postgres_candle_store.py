@@ -99,6 +99,21 @@ def test_recent_candles_mid_derivation_from_decimal_rows():
     assert candles[0].close == pytest.approx(1.11)
 
 
+def test_recent_candles_normalizes_timestamp_to_utc():
+    from datetime import timedelta
+
+    from infrastructure.postgres.candle_store import PostgresCandleStore
+
+    non_utc = datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
+    rows = [_decimal_row(non_utc, open_bid=1.00, open_ask=1.20)]
+    store = PostgresCandleStore(_FakeConn(rows=rows))
+
+    candles = store.recent_candles(symbol="EURUSD", resolution="MINUTE_15", count=1)
+
+    assert candles[0].timestamp.utcoffset() == timedelta(0)
+    assert candles[0].timestamp == datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+
 def test_decimal_to_float_cast_probe():
     """Probe (c): psycopg v3 returns Decimal for NUMERIC — cast must produce float, not Decimal."""
     from infrastructure.postgres.candle_store import PostgresCandleStore
