@@ -272,3 +272,22 @@ def test_freshness_fields_absent_from_config():
     cfg = _load_config(_REQUIRED_ENV)
     assert not hasattr(cfg, "freshness_max_retries")
     assert not hasattr(cfg, "freshness_retry_seconds")
+
+
+# ---------------------------------------------------------------------------
+# provider-aware-data-model — Config.provider
+# ---------------------------------------------------------------------------
+
+def test_config_provider_defaults_to_capital():
+    cfg = _load_config(_REQUIRED_ENV)
+    assert cfg.provider == "capital"
+
+
+def test_config_provider_reads_from_env():
+    cfg = _load_config({**_REQUIRED_ENV, "PROVIDER": "ic_markets"})
+    assert cfg.provider == "ic_markets"
+
+
+def test_config_provider_lowercased():
+    cfg = _load_config({**_REQUIRED_ENV, "PROVIDER": "IC_MARKETS"})
+    assert cfg.provider == "ic_markets"

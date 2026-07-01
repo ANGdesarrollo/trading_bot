@@ -49,6 +49,8 @@ class Config:
     ws_ping_interval_seconds: int
     required_candles: int
     backfill_max_candles: int
+    auth_max_retries: int
+    provider: str = "capital"
 
     @property
     def epics(self) -> dict[str, str]:
@@ -103,6 +105,8 @@ def load_config() -> Config:
     session_refresh_ttl_seconds = float(env.get("SESSION_REFRESH_TTL_SECONDS", "540"))
     ws_ping_interval_seconds = int(env.get("WS_PING_INTERVAL_SECONDS", "540"))
     backfill_max_candles = int(env.get("BACKFILL_MAX_CANDLES", "500"))
+    auth_max_retries = int(env.get("AUTH_MAX_RETRIES", "5"))
+    provider = env.get("PROVIDER", "capital").lower()
 
     if ws_ping_interval_seconds >= _WS_PING_MAX_SECONDS:
         raise ValueError(
@@ -140,4 +144,6 @@ def load_config() -> Config:
         ws_ping_interval_seconds=ws_ping_interval_seconds,
         required_candles=warmup_bars,
         backfill_max_candles=backfill_max_candles,
+        auth_max_retries=auth_max_retries,
+        provider=provider,
     )
