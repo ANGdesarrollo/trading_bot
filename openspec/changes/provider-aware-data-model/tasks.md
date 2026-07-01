@@ -30,25 +30,25 @@ Chain strategy: pending
 
 ### Phase 1: Schema migrations
 
-- [ ] 1.1 **RED** `tests/integration/test_candle_migration.py` (modify) — assert `candles` table has `provider` column after migration 003; existing rows default to `"capital"`; new unique constraint is `(provider,epic,resolution,candle_start)`; old constraint `candles_epic_resolution_candle_start_key` absent; `idx_candles_recent` exists and leads with `provider`; two rows same `(epic,resolution,candle_start)` different `provider` coexist (no constraint violation). (CSP-07)
-- [ ] 1.2 **GREEN** Create `src/infrastructure/postgres/migrations/003_add_provider_to_candles.sql` — `ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'capital'`; `DROP CONSTRAINT IF EXISTS candles_epic_resolution_candle_start_key`; `DROP INDEX IF EXISTS idx_candles_recent`; `ADD CONSTRAINT candles_provider_epic_resolution_candle_start_key UNIQUE(provider,epic,resolution,candle_start)`; `CREATE INDEX IF NOT EXISTS idx_candles_recent ON candles(provider,epic,resolution,candle_start DESC)`. Make 1.1 pass.
-- [ ] 1.3 **RED** `tests/integration/test_candle_migration.py` (same file) — assert `trade_entries` table has `provider` column after migration 004; existing rows default to `"capital"`; `deal_id` remains the identity column (no new unique change). (CSP-10)
-- [ ] 1.4 **GREEN** Create `src/infrastructure/postgres/migrations/004_add_provider_to_trade_entries.sql` — `ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'capital'`. Make 1.3 pass.
+- [x] 1.1 **RED** `tests/integration/test_candle_migration.py` (modify) — assert `candles` table has `provider` column after migration 003; existing rows default to `"capital"`; new unique constraint is `(provider,epic,resolution,candle_start)`; old constraint `candles_epic_resolution_candle_start_key` absent; `idx_candles_recent` exists and leads with `provider`; two rows same `(epic,resolution,candle_start)` different `provider` coexist (no constraint violation). (CSP-07)
+- [x] 1.2 **GREEN** Create `src/infrastructure/postgres/migrations/003_add_provider_to_candles.sql` — `ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'capital'`; `DROP CONSTRAINT IF EXISTS candles_epic_resolution_candle_start_key`; `DROP INDEX IF EXISTS idx_candles_recent`; `ADD CONSTRAINT candles_provider_epic_resolution_candle_start_key UNIQUE(provider,epic,resolution,candle_start)`; `CREATE INDEX IF NOT EXISTS idx_candles_recent ON candles(provider,epic,resolution,candle_start DESC)`. Make 1.1 pass.
+- [x] 1.3 **RED** `tests/integration/test_candle_migration.py` (same file) — assert `trade_entries` table has `provider` column after migration 004; existing rows default to `"capital"`; `deal_id` remains the identity column (no new unique change). (CSP-10)
+- [x] 1.4 **GREEN** Create `src/infrastructure/postgres/migrations/004_add_provider_to_trade_entries.sql` — `ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'capital'`. Make 1.3 pass.
 
 ### Phase 2: CandleRow entity
 
-- [ ] 1.5 **RED** `tests/unit/test_candle_row.py` (modify) — assert `CandleRow` has `provider` as its first field; `CandleRow()` without explicit `provider` has `row.provider == "capital"`; `CandleRow(provider="ic_markets", …)` has `row.provider == "ic_markets"`; mutation still raises `AttributeError`. (CSP-02)
-- [ ] 1.6 **GREEN** Modify `src/domain/entities/candle_row.py` — add `provider: str = "capital"` as the **first** field of the frozen `slots=True` dataclass. Make 1.5 pass.
+- [x] 1.5 **RED** `tests/unit/test_candle_row.py` (modify) — assert `CandleRow` has `provider` as its first field; `CandleRow()` without explicit `provider` has `row.provider == "capital"`; `CandleRow(provider="ic_markets", …)` has `row.provider == "ic_markets"`; mutation still raises `AttributeError`. (CSP-02)
+- [x] 1.6 **GREEN** Modify `src/domain/entities/candle_row.py` — add `provider: str = "capital"` as the **first** field of the frozen `slots=True` dataclass. Make 1.5 pass.
 
 ### Phase 3: JournalEntry entity
 
-- [ ] 1.7 **RED** `tests/unit/test_journal_entities.py` (modify) — assert `JournalEntry` has `provider` field; default is `"capital"`; `JournalEntry(provider="capital", …)` mutation raises `AttributeError`. (TC-07)
-- [ ] 1.8 **GREEN** Modify `src/domain/entities/journal.py` — add `provider: str = "capital"` to the `JournalEntry` frozen dataclass. Make 1.7 pass.
+- [x] 1.7 **RED** `tests/unit/test_journal_entities.py` (modify) — assert `JournalEntry` has `provider` field; default is `"capital"`; `JournalEntry(provider="capital", …)` mutation raises `AttributeError`. (TC-07)
+- [x] 1.8 **GREEN** Modify `src/domain/entities/journal.py` — add `provider: str = "capital"` to the `JournalEntry` frozen dataclass. Make 1.7 pass.
 
 ### Phase 4: Config provider field
 
-- [ ] 1.9 **RED** `tests/unit/test_config.py` (modify) — assert `Config()` (no env) has `config.provider == "capital"`; with `PROVIDER="ic_markets"` env, `config.provider == "ic_markets"`. (CSP-09)
-- [ ] 1.10 **GREEN** Modify `src/config.py` — add `provider: str` sourced from `env.get("PROVIDER", "capital").lower()`. Make 1.9 pass.
+- [x] 1.9 **RED** `tests/unit/test_config.py` (modify) — assert `Config()` (no env) has `config.provider == "capital"`; with `PROVIDER="ic_markets"` env, `config.provider == "ic_markets"`. (CSP-09)
+- [x] 1.10 **GREEN** Modify `src/config.py` — add `provider: str` sourced from `env.get("PROVIDER", "capital").lower()`. Make 1.10 pass.
 
 > **Slice 1 exit gate**: `uv run python -m pytest` passes; `CandleRow.provider` defaults to `"capital"`; `JournalEntry.provider` defaults to `"capital"`; migrations 003/004 green; existing callers untouched (all prior tests still pass via defaults).
 
