@@ -8,6 +8,7 @@ from domain.entities.journal import JournalEntry
 from domain.entities.order import OrderResult
 from domain.entities.signal import Signal
 from domain.ports.broker_port import BrokerPort
+from domain.ports.candle_store_port import CandleStorePort
 from domain.ports.clock_port import ClockPort
 from domain.ports.strategy_port import StrategyPort
 from domain.ports.trade_journal_port import TradeJournalPort
@@ -23,8 +24,8 @@ class RunTradingCycleUseCase:
         logger: logging.Logger,
         clock: ClockPort,
         poll_minutes: int,
-        freshness_max_retries: int,
-        freshness_retry_seconds: float,
+        candle_store: CandleStorePort,
+        resolution: str,
         journal: TradeJournalPort,
     ) -> None:
         self._broker = broker
@@ -34,8 +35,8 @@ class RunTradingCycleUseCase:
         self._logger = logger
         self._clock = clock
         self._poll_minutes = poll_minutes
-        self._freshness_max_retries = freshness_max_retries
-        self._freshness_retry_seconds = freshness_retry_seconds
+        self._candle_store = candle_store
+        self._resolution = resolution
         self._journal = journal
 
     def execute(self) -> OrderResult | None:
@@ -43,26 +44,20 @@ class RunTradingCycleUseCase:
             self._logger.info("position already open; skipping placement")
             return None
 
-        period_secs = self._poll_minutes * 60
-        now_epoch = self._clock.utcnow().timestamp()
-        # epoch-modulo mirrors seconds_until_next_boundary to avoid off-by-one on boundary-exact times
-        boundary_epoch = now_epoch - (now_epoch % period_secs)
-        expected_decision_ts = datetime.fromtimestamp(
-            boundary_epoch - period_secs, tz=timezone.utc)
+        candles = self._candle_store.recent_candles(
+            self._symbol, self._resolution, self._strategy.required_candles)
 
-        for attempt in range(self._freshness_max_retries + 1):
-            candles = self._broker.recent_candles(
-                self._symbol, self._strategy.required_candles)
-            if candles[-1].timestamp == expected_decision_ts:
-                break
-            if attempt < self._freshness_max_retries:
-                self._clock.sleep(self._freshness_retry_seconds)
-        else:
+        if len(candles) < self._strategy.required_candles:
+            return None
+
+        expected_decision_ts = self._expected_boundary()
+
+        if candles[-1].timestamp != expected_decision_ts:
             self._logger.warning(
-                "stale candle for %s after %d retries at boundary %s; "
-                "expected %s, got %s; skipping",
-                self._symbol, self._freshness_max_retries, expected_decision_ts,
-                expected_decision_ts, candles[-1].timestamp)
+                "stale candle for %s at boundary %s; expected %s, got %s; skipping",
+                self._symbol, expected_decision_ts,
+                expected_decision_ts, candles[-1].timestamp,
+            )
             return None
 
         signal = self._strategy.evaluate(candles)
@@ -80,6 +75,12 @@ class RunTradingCycleUseCase:
         except Exception:
             self._logger.exception("journal record_entry failed; continuing")
         return result
+
+    def _expected_boundary(self) -> datetime:
+        period_secs = self._poll_minutes * 60
+        now_epoch = self._clock.utcnow().timestamp()
+        boundary_epoch = now_epoch - (now_epoch % period_secs)
+        return datetime.fromtimestamp(boundary_epoch - period_secs, tz=timezone.utc)
 
     def _build_entry(
         self,

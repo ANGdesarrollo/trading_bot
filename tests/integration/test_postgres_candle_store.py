@@ -59,7 +59,7 @@ def test_recent_candles_returns_three_oldest_first_mid_derived(pg_conn):
     store = PostgresCandleStore(pg_conn)
     for ts in [_T1, _T2, _T3, _T4, _T5]:
         store.upsert_candle(_make_row(ts, open_bid=1.00, open_ask=1.20))
-    candles = store.recent_candles("EURUSD", 3)
+    candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
     assert len(candles) == 3
     assert candles[0].timestamp == _T3
     assert candles[1].timestamp == _T4
@@ -73,14 +73,29 @@ def test_recent_candles_respects_count_cap(pg_conn):
     for i in range(10):
         ts = datetime(2024, 1, 1, 10, i * 15, 0, tzinfo=timezone.utc)
         store.upsert_candle(_make_row(ts))
-    candles = store.recent_candles("EURUSD", 3)
+    candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
     assert len(candles) == 3
+
+
+def test_recent_candles_isolates_by_resolution(pg_conn):
+    from infrastructure.postgres.candle_store import PostgresCandleStore
+    store = PostgresCandleStore(pg_conn)
+    for ts in [_T1, _T2, _T3]:
+        store.upsert_candle(_make_row(ts, resolution="MINUTE_15"))
+    for ts in [_T4, _T5]:
+        store.upsert_candle(_make_row(ts, resolution="HOUR"))
+
+    m15 = store.recent_candles("EURUSD", "MINUTE_15", 10)
+    hour = store.recent_candles("EURUSD", "HOUR", 10)
+
+    assert [c.timestamp for c in m15] == [_T1, _T2, _T3]
+    assert [c.timestamp for c in hour] == [_T4, _T5]
 
 
 def test_recent_candles_empty_table_returns_empty(pg_conn):
     from infrastructure.postgres.candle_store import PostgresCandleStore
     store = PostgresCandleStore(pg_conn)
-    candles = store.recent_candles("EURUSD", 10)
+    candles = store.recent_candles("EURUSD", "MINUTE_15", 10)
     assert list(candles) == []
 
 

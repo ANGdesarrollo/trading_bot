@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import datetime, timezone
 
-from domain.entities.candle import Candle
 from domain.entities.direction import Direction
 from domain.entities.order import OrderResult
 from domain.entities.signal import Signal
@@ -40,19 +37,6 @@ class CapitalBrokerAdapter(BrokerPort):
         self._base_url = base_url.rstrip("/")
         self._epics = epics
         self._timeframe = timeframe
-
-    def recent_candles(self, symbol: str, count: int) -> Sequence[Candle]:
-        epic = self._epic_for(symbol)
-        tokens = self._session.tokens()
-        url = (
-            f"{self._base_url}/prices/{epic}"
-            f"?resolution={self._timeframe}&max={count + 1}"
-        )
-        response = self._http.get(url, headers=self._auth_headers(tokens))
-        response.raise_for_status()
-        records = response.json()["prices"]
-        closed_records = records[:-1]
-        return [_parse_candle(r) for r in closed_records]
 
     def open_position(self, symbol: str, signal: Signal, size: float) -> OrderResult:
         epic = self._epic_for(symbol)
@@ -125,16 +109,3 @@ def _opened_position_deal_id(confirm: dict) -> str:
         if deal.get("status") == "OPENED":
             return deal["dealId"]
     return confirm["dealId"]
-
-
-def _parse_candle(record: dict) -> Candle:
-    ts = datetime.fromisoformat(
-        record["snapshotTimeUTC"].replace("Z", "+00:00")
-    ).replace(tzinfo=timezone.utc)
-    return Candle(
-        timestamp=ts,
-        open=float(record["openPrice"]["bid"]),
-        high=float(record["highPrice"]["bid"]),
-        low=float(record["lowPrice"]["bid"]),
-        close=float(record["closePrice"]["bid"]),
-    )

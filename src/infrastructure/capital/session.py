@@ -36,6 +36,7 @@ class CapitalSession:
         self._identifier = identifier
         self._password = password
         self._tokens: SessionTokens | None = None
+        self._streaming_host: str | None = None
 
     def authenticate(self) -> SessionTokens:
         response = self._http.post(
@@ -50,9 +51,17 @@ class CapitalSession:
         cst = response.headers.get("CST", "")
         security_token = response.headers.get("X-SECURITY-TOKEN", "")
         self._tokens = SessionTokens(cst=cst, security_token=security_token)
+        body = response.json()
+        self._streaming_host = body.get("streamingHost")
         return self._tokens
 
     def tokens(self) -> SessionTokens:
         if self._tokens is None:
             raise RuntimeError("Not authenticated — call authenticate() first")
         return self._tokens
+
+    @property
+    def streaming_host(self) -> str:
+        if self._streaming_host is None:
+            raise RuntimeError("Not authenticated — call authenticate() first")
+        return self._streaming_host

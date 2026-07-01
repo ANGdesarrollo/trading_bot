@@ -18,6 +18,7 @@ seconds_until_next_boundary = _mod.seconds_until_next_boundary
 run_forever = _mod.run_forever
 build_use_cases = _mod.build_use_cases
 
+from tests.fakes.fake_candle_store import FakeCandleStore
 from tests.fakes.fake_clock import FakeClock
 from tests.fakes.fake_journal import FakeJournalPort
 
@@ -57,8 +58,6 @@ def _make_config(warmup_bars: int):
     config.timeframe = "MINUTE_15"
     config.poll_minutes = 15
     config.candle_settle_seconds = 0
-    config.freshness_max_retries = 3
-    config.freshness_retry_seconds = 2.0
     config.symbols = [MagicMock(symbol="EURUSD", epic="CS.D.EURUSD.MINI.IP", size=1000.0)]
     return config
 
@@ -107,7 +106,8 @@ def test_build_use_cases_returns_one_per_symbol():
     clock = MagicMock()
     journal = FakeJournalPort()
 
-    use_cases, session = build_use_cases(config, http, clock, journal=journal)
+    use_cases, session = build_use_cases(
+        config, http, clock, journal=journal, candle_store=FakeCandleStore())
 
     assert len(use_cases) == 2
 
@@ -130,7 +130,8 @@ def test_build_use_cases_accepts_warmup_at_strategy_minimum():
     http = MagicMock()
     clock = MagicMock()
 
-    use_cases, session = build_use_cases(config, http, clock, journal=FakeJournalPort())
+    use_cases, session = build_use_cases(
+        config, http, clock, journal=FakeJournalPort(), candle_store=FakeCandleStore())
 
     assert use_cases is not None
 

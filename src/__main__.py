@@ -22,6 +22,7 @@ from infrastructure.capital.broker import CapitalBrokerAdapter
 from infrastructure.capital.cached_session import CachedSession
 from infrastructure.capital.clock import SystemClock
 from infrastructure.capital.session import CapitalSession
+from infrastructure.postgres.candle_store import PostgresCandleStore
 from infrastructure.postgres.connection import connect
 from infrastructure.postgres.journal_adapter import PostgresTradeJournal
 from infrastructure.postgres.migration_runner import run_migrations
@@ -46,7 +47,7 @@ def seconds_until_next_boundary(now: datetime, period_minutes: int) -> float:
     return float(wait)
 
 
-def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None):
+def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None, candle_store=None):
     capital_session = CapitalSession(
         http=http,
         base_url=config.base_url,
@@ -76,6 +77,8 @@ def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None
         conn = connect(config.database_url)
         run_migrations(conn)
         journal = PostgresTradeJournal(conn)
+        if candle_store is None:
+            candle_store = PostgresCandleStore(conn)
     use_cases = [
         RunTradingCycleUseCase(
             broker=broker,
@@ -85,8 +88,8 @@ def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None
             logger=logger,
             clock=clock,
             poll_minutes=config.poll_minutes,
-            freshness_max_retries=config.freshness_max_retries,
-            freshness_retry_seconds=config.freshness_retry_seconds,
+            candle_store=candle_store,
+            resolution=config.timeframe,
             journal=journal,
         )
         for sc in config.symbols

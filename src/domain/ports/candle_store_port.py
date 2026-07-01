@@ -10,8 +10,8 @@ from domain.entities.candle_row import CandleRow
 
 class CandleStorePort(ABC):
     @abstractmethod
-    def recent_candles(self, symbol: str, count: int) -> Sequence[Candle]:
-        """Return up to `count` most-recently closed candles oldest-first, OHLC as mid=(bid+ask)/2."""
+    def recent_candles(self, symbol: str, resolution: str, count: int) -> Sequence[Candle]:
+        """Return up to `count` most-recent closed candles for (symbol, resolution), oldest-first, OHLC as mid=(bid+ask)/2."""
 
     @abstractmethod
     def last_candle_start(self, symbol: str, resolution: str) -> datetime | None:

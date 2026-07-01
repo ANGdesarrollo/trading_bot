@@ -95,3 +95,52 @@ def test_no_tokens_stored_after_failed_auth():
 
     with pytest.raises(RuntimeError):
         session.tokens()
+
+
+def test_streaming_host_raises_before_authenticate():
+    session, _ = _make_session([])
+
+    with pytest.raises(RuntimeError):
+        _ = session.streaming_host
+
+
+def test_streaming_host_available_after_authenticate():
+    response = CannedResponse(
+        status_code=200,
+        headers={"CST": "cst-value-123", "X-SECURITY-TOKEN": "xst-value-456"},
+        json_body={"streamingHost": "wss://api-streaming-capital.backend-capital.com"},
+    )
+    session, _ = _make_session([response])
+
+    session.authenticate()
+
+    assert session.streaming_host == "wss://api-streaming-capital.backend-capital.com"
+
+
+def test_authenticate_still_returns_session_tokens_with_streaming_host():
+    response = CannedResponse(
+        status_code=200,
+        headers={"CST": "cst-s2", "X-SECURITY-TOKEN": "xst-s2"},
+        json_body={"streamingHost": "wss://streaming.example.com"},
+    )
+    session, _ = _make_session([response])
+
+    tokens = session.authenticate()
+
+    assert tokens.cst == "cst-s2"
+    assert tokens.security_token == "xst-s2"
+
+
+def test_tokens_still_works_after_streaming_host_captured():
+    response = CannedResponse(
+        status_code=200,
+        headers={"CST": "cst-t", "X-SECURITY-TOKEN": "xst-t"},
+        json_body={"streamingHost": "wss://streaming.example.com"},
+    )
+    session, _ = _make_session([response])
+    session.authenticate()
+
+    tokens = session.tokens()
+
+    assert tokens.cst == "cst-t"
+    assert tokens.security_token == "xst-t"

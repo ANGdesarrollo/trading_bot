@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from domain.ports.broker_port import BrokerPort
 from domain.ports.trade_journal_port import TradeJournalPort
 from domain.ports.trade_history_port import TradeHistoryPort
 from domain.ports.candle_store_port import CandleStorePort
@@ -46,3 +47,12 @@ def test_candle_history_port_cannot_be_instantiated():
 
 def test_candle_history_port_declares_fetch_history():
     assert hasattr(CandleHistoryPort, "fetch_history")
+
+
+def test_broker_port_has_no_recent_candles():
+    assert not hasattr(BrokerPort, "recent_candles")
+
+
+def test_broker_port_declares_only_order_methods():
+    assert hasattr(BrokerPort, "open_position")
+    assert hasattr(BrokerPort, "has_open_position")

@@ -29,7 +29,7 @@ SELECT candle_start,
        open_bid, high_bid, low_bid, close_bid,
        open_ask, high_ask, low_ask, close_ask
 FROM candles
-WHERE epic = %s
+WHERE epic = %s AND resolution = %s
 ORDER BY candle_start DESC
 LIMIT %s
 """
@@ -67,9 +67,9 @@ class PostgresCandleStore(CandleStorePort):
             ))
         self._conn.commit()
 
-    def recent_candles(self, symbol: str, count: int) -> Sequence[Candle]:
+    def recent_candles(self, symbol: str, resolution: str, count: int) -> Sequence[Candle]:
         with self._conn.cursor() as cur:
-            cur.execute(_SELECT_RECENT, (symbol, count))
+            cur.execute(_SELECT_RECENT, (symbol, resolution, count))
             rows = cur.fetchall()
         return [_row_to_candle(row) for row in reversed(rows)]
 
