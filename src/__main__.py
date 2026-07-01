@@ -106,6 +106,8 @@ def run_forever(config, use_cases, session, clock) -> None:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     config = load_config()
     http = requests.Session()
     clock = SystemClock()

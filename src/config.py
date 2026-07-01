@@ -11,10 +11,6 @@ import os
 from dataclasses import dataclass
 from typing import Sequence
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 _DEMO_BASE_URL = "https://demo-api-capital.backend-capital.com/api/v1"
 _LIVE_BASE_URL = "https://api-capital.backend-capital.com/api/v1"  # UNVERIFIED
 
