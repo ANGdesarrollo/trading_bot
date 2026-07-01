@@ -104,7 +104,7 @@ def test_recent_candles_isolates_by_provider(pg_conn):
             open_ask=1.101, high_ask=1.111, low_ask=1.091, close_ask=1.106,
         ))
     candles = store.recent_candles(
-        "capital", symbol="EURUSD", resolution="MINUTE_15", count=10
+        provider="capital", symbol="EURUSD", resolution="MINUTE_15", count=10
     )
     assert len(candles) == 5
     for c in candles:
@@ -128,7 +128,7 @@ def test_last_candle_start_isolates_by_provider(pg_conn):
             open_ask=1.101, high_ask=1.111, low_ask=1.091, close_ask=1.106,
         ))
     result = store.last_candle_start(
-        "capital", symbol="EURUSD", resolution="MINUTE_15"
+        provider="capital", symbol="EURUSD", resolution="MINUTE_15"
     )
     assert result == _T3
 

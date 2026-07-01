@@ -68,7 +68,7 @@ class PostgresCandleStore(CandleStorePort):
         self._conn.commit()
 
     def recent_candles(
-        self, provider: str = "capital", *, symbol: str, resolution: str, count: int
+        self, *, provider: str = "capital", symbol: str, resolution: str, count: int
     ) -> Sequence[Candle]:
         with self._conn.cursor() as cur:
             cur.execute(_SELECT_RECENT, (provider, symbol, resolution, count))
@@ -76,7 +76,7 @@ class PostgresCandleStore(CandleStorePort):
         return [_row_to_candle(row) for row in reversed(rows)]
 
     def last_candle_start(
-        self, provider: str = "capital", *, symbol: str, resolution: str
+        self, *, provider: str = "capital", symbol: str, resolution: str
     ) -> datetime | None:
         with self._conn.cursor() as cur:
             cur.execute(_SELECT_LAST_START, (provider, symbol, resolution))

@@ -146,7 +146,7 @@ def test_recent_candles_filters_by_provider():
 
     conn = _FakeConn(rows=[_decimal_row(_T1, open_bid=1.0, open_ask=1.2)])
     store = PostgresCandleStore(conn)
-    store.recent_candles("ic_markets", symbol="EURUSD", resolution="HOUR", count=3)
+    store.recent_candles(provider="ic_markets", symbol="EURUSD", resolution="HOUR", count=3)
 
     sql, params = conn._cursor.executed[0]
     assert "provider = %s" in sql
