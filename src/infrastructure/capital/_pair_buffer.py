@@ -38,8 +38,13 @@ class PairBuffer:
     Used to compute the staleness threshold (4 * period) for eviction.
     """
 
-    def __init__(self, period_ms_map: dict[tuple[str, str], int]) -> None:
+    def __init__(
+        self,
+        period_ms_map: dict[tuple[str, str], int],
+        provider: str = "capital",
+    ) -> None:
         self._period_ms_map = period_ms_map
+        self._provider = provider
         self._partials: dict[tuple[str, str, int], _Partial] = {}
         self._newest_t_by_key: dict[tuple[str, str], int] = {}
 
@@ -76,6 +81,7 @@ class PairBuffer:
         if partial.complete():
             candle_start = datetime.fromtimestamp(t_ms / 1000, tz=timezone.utc)
             row = CandleRow(
+                provider=self._provider,
                 epic=epic,
                 resolution=resolution,
                 candle_start=candle_start,

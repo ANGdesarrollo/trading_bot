@@ -166,3 +166,25 @@ def test_non_stale_partial_not_evicted():
     upsert.assert_called_once()
     row = upsert.call_args[0][0]
     assert row.candle_start == datetime.fromtimestamp(t1 / 1000, tz=timezone.utc)
+
+
+def test_provider_defaults_to_capital_on_emitted_row():
+    upsert = MagicMock()
+    buf = PairBuffer(period_ms_map={(_EPIC, _RES): _PERIOD_MS})
+
+    buf.on_event(_bid_event(), upsert)
+    buf.on_event(_ask_event(), upsert)
+
+    row = upsert.call_args[0][0]
+    assert row.provider == "capital"
+
+
+def test_provider_stamped_from_constructor():
+    upsert = MagicMock()
+    buf = PairBuffer(period_ms_map={(_EPIC, _RES): _PERIOD_MS}, provider="ic_markets")
+
+    buf.on_event(_bid_event(), upsert)
+    buf.on_event(_ask_event(), upsert)
+
+    row = upsert.call_args[0][0]
+    assert row.provider == "ic_markets"
