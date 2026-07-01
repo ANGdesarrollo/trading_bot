@@ -25,7 +25,13 @@ def pg_conn():
     run_migrations(conn)
     conn.execute("SAVEPOINT test_start")
     yield conn
-    conn.execute("ROLLBACK TO SAVEPOINT test_start")
+    try:
+        conn.execute("ROLLBACK TO SAVEPOINT test_start")
+    except Exception:
+        conn.rollback()
+        conn.execute("DELETE FROM candles")
+        conn.execute("DELETE FROM trade_entries")
+        conn.commit()
     conn.close()
 
 
@@ -58,20 +64,24 @@ def test_recent_candles_returns_three_oldest_first_mid_derived(pg_conn):
     from infrastructure.postgres.candle_store import PostgresCandleStore
     store = PostgresCandleStore(pg_conn)
     for ts in [_T1, _T2, _T3, _T4, _T5]:
-        store.upsert_candle(_make_row(ts, open_bid=1.00, open_ask=1.20))
+        store.upsert_candle(_make_row(
+            ts,
+            open_bid=1.08, high_bid=1.12, low_bid=1.07, close_bid=1.10,
+            open_ask=1.081, high_ask=1.121, low_ask=1.071, close_ask=1.101,
+        ))
     candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
     assert len(candles) == 3
     assert candles[0].timestamp == _T3
     assert candles[1].timestamp == _T4
     assert candles[2].timestamp == _T5
-    assert candles[0].open == pytest.approx(1.10)
+    assert candles[0].open == pytest.approx((1.08 + 1.081) / 2)
 
 
 def test_recent_candles_respects_count_cap(pg_conn):
     from infrastructure.postgres.candle_store import PostgresCandleStore
     store = PostgresCandleStore(pg_conn)
-    for i in range(10):
-        ts = datetime(2024, 1, 1, 10, i * 15, 0, tzinfo=timezone.utc)
+    for i in range(4):
+        ts = datetime(2024, 1, 1, 10 + i, 0, 0, tzinfo=timezone.utc)
         store.upsert_candle(_make_row(ts))
     candles = store.recent_candles("EURUSD", "MINUTE_15", 3)
     assert len(candles) == 3

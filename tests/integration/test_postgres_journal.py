@@ -52,7 +52,12 @@ def pg_conn():
     run_migrations(conn)
     conn.execute("SAVEPOINT test_start")
     yield conn
-    conn.execute("ROLLBACK TO SAVEPOINT test_start")
+    try:
+        conn.execute("ROLLBACK TO SAVEPOINT test_start")
+    except Exception:
+        conn.rollback()
+        conn.execute("DELETE FROM trade_entries")
+        conn.commit()
     conn.close()
 
 

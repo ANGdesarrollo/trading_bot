@@ -9,11 +9,11 @@ from domain.ports.candle_store_port import CandleStorePort
 
 _UPSERT = """
 INSERT INTO candles (
-    epic, resolution, candle_start,
+    provider, epic, resolution, candle_start,
     open_bid, high_bid, low_bid, close_bid,
     open_ask, high_ask, low_ask, close_ask
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (epic, resolution, candle_start) DO UPDATE SET
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (provider, epic, resolution, candle_start) DO UPDATE SET
     open_bid  = EXCLUDED.open_bid,
     high_bid  = EXCLUDED.high_bid,
     low_bid   = EXCLUDED.low_bid,
@@ -61,7 +61,7 @@ class PostgresCandleStore(CandleStorePort):
     def upsert_candle(self, row: CandleRow) -> None:
         with self._conn.cursor() as cur:
             cur.execute(_UPSERT, (
-                row.epic, row.resolution, row.candle_start,
+                row.provider, row.epic, row.resolution, row.candle_start,
                 row.open_bid, row.high_bid, row.low_bid, row.close_bid,
                 row.open_ask, row.high_ask, row.low_ask, row.close_ask,
             ))
