@@ -58,27 +58,27 @@ Chain strategy: pending
 
 ### Phase 5: CandleStorePort signature
 
-- [ ] 2.1 **RED** `tests/unit/test_candle_store_port.py` (modify) — assert `recent_candles` signature leads with `provider` having default `"capital"`; same for `last_candle_start`; ABC still raises `TypeError` if not implemented. (CSP-01)
-- [ ] 2.2 **GREEN** Modify `src/domain/ports/candle_store_port.py` — add `provider: str = "capital"` as first param (after `self`) to `recent_candles` and `last_candle_start`. Make 2.1 pass.
+- [x] 2.1 **RED** `tests/unit/test_candle_store_port.py` (modify) — assert `recent_candles` signature leads with `provider` having default `"capital"`; same for `last_candle_start`; ABC still raises `TypeError` if not implemented. (CSP-01)
+- [x] 2.2 **GREEN** Modify `src/domain/ports/candle_store_port.py` — add `provider: str = "capital"` as first param (after `self`) to `recent_candles` and `last_candle_start`. Make 2.1 pass.
 
 ### Phase 6: CandleHistoryPort signature
 
-- [ ] 2.3 **RED** `tests/unit/test_candle_history_port.py` (modify) — assert `fetch_history` leads with `provider: str = "capital"`. (CS-05)
-- [ ] 2.4 **GREEN** Modify `src/domain/ports/candle_history_port.py` — add `provider: str = "capital"` as first param to `fetch_history`. Make 2.3 pass.
+- [x] 2.3 **RED** `tests/unit/test_candle_history_port.py` (modify) — assert `fetch_history` leads with `provider: str = "capital"`. (CS-05)
+- [x] 2.4 **GREEN** Modify `src/domain/ports/candle_history_port.py` — add `provider: str = "capital"` as first param to `fetch_history`. Make 2.3 pass.
 
 ### Phase 7: FakeCandleStore seam
 
-- [ ] 2.5 **GREEN** Modify `tests/fakes/fake_candle_store.py` — add `provider` param to `recent_candles` and `last_candle_start` to match updated port signature; record it in call-log for assertion. (no new RED — fixes existing fake to compile)
+- [x] 2.5 **GREEN** Modify `tests/fakes/fake_candle_store.py` — add `provider` param to `recent_candles` and `last_candle_start` to match updated port signature; record it in call-log for assertion. (no new RED — fixes existing fake to compile)
 
 ### Phase 8: PostgresCandleStore adapter
 
-- [ ] 2.6 **RED** `tests/integration/test_postgres_candle_store.py` (modify) — assert `upsert_candle` twice same `(provider,epic,resolution,candle_start)` → one row, second OHLC wins (AC-CSP-1); rows from `provider="capital"` and `provider="ic_markets"` coexist on same `(epic,resolution,candle_start)` (CSP-04); `recent_candles("capital",…)` returns only capital rows when ic_markets rows also exist (CSP-05 provider isolation); `last_candle_start("capital",…)` returns T3 not T5 when ic_markets has T5 (CSP-06). (CSP-04, CSP-05, CSP-06)
-- [ ] 2.7 **GREEN** Modify `src/infrastructure/postgres/candle_store.py` — `upsert_candle` SQL: `provider` becomes first column in `INSERT` and `ON CONFLICT(provider,epic,resolution,candle_start)`; `recent_candles` WHERE clause adds `provider=%s` as first predicate; `last_candle_start` WHERE clause adds `provider=%s` as first predicate. Make 2.6 pass.
+- [x] 2.6 **RED** `tests/integration/test_postgres_candle_store.py` (modify) — assert `upsert_candle` twice same `(provider,epic,resolution,candle_start)` → one row, second OHLC wins (AC-CSP-1); rows from `provider="capital"` and `provider="ic_markets"` coexist on same `(epic,resolution,candle_start)` (CSP-04); `recent_candles("capital",…)` returns only capital rows when ic_markets rows also exist (CSP-05 provider isolation); `last_candle_start("capital",…)` returns T3 not T5 when ic_markets has T5 (CSP-06). (CSP-04, CSP-05, CSP-06)
+- [x] 2.7 **GREEN** Modify `src/infrastructure/postgres/candle_store.py` — `upsert_candle` SQL: `provider` becomes first column in `INSERT` and `ON CONFLICT(provider,epic,resolution,candle_start)`; `recent_candles` WHERE clause adds `provider=%s` as first predicate; `last_candle_start` WHERE clause adds `provider=%s` as first predicate. Make 2.6 pass.
 
 ### Phase 9: PostgresTradeJournal adapter
 
-- [ ] 2.8 **RED** `tests/integration/test_postgres_journal.py` (modify) — assert inserting a `JournalEntry(provider="capital", …)` persists `provider`; `_row_to_entry` reconstructs `provider` correctly; existing open-positions query still returns entries. (TC-07)
-- [ ] 2.9 **GREEN** Modify `src/infrastructure/postgres/journal_adapter.py` — add `provider` to `_INSERT_ENTRY` column list and `VALUES` placeholders; add `provider` to `_SELECT_OPEN` column list; map it in `_row_to_entry`. Make 2.8 pass.
+- [x] 2.8 **RED** `tests/integration/test_postgres_journal.py` (modify) — assert inserting a `JournalEntry(provider="capital", …)` persists `provider`; `_row_to_entry` reconstructs `provider` correctly; existing open-positions query still returns entries. (TC-07)
+- [x] 2.9 **GREEN** Modify `src/infrastructure/postgres/journal_adapter.py` — add `provider` to `_INSERT_ENTRY` column list and `VALUES` placeholders; add `provider` to `_SELECT_OPEN` column list; map it in `_row_to_entry`. Make 2.8 pass.
 
 > **Slice 2 exit gate**: `uv run python -m pytest` passes; integration tests assert provider isolation in `candles`; `PostgresTradeJournal` round-trips `provider`; all pre-existing AC-CSP-* and AC-TC-* tests still green.
 
