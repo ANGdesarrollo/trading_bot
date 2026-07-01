@@ -7,10 +7,12 @@ from domain.entities.candle_row import CandleRow
 from domain.ports.candle_history_port import CandleHistoryPort
 from infrastructure.capital.session import CapitalSession
 
+_SNAPSHOT_UTC_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
 
 def _to_iso(dt: datetime) -> str:
-    # Capital's /prices rejects trailing 'Z'; expects naive-looking UTC ISO string.
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    # Capital's /prices rejects a trailing 'Z'; it expects naive-looking UTC ISO.
+    return dt.astimezone(timezone.utc).strftime(_SNAPSHOT_UTC_FORMAT)
 
 
 def _now_iso() -> str:
@@ -20,11 +22,12 @@ def _now_iso() -> str:
 class CapitalCandleHistory(CandleHistoryPort):
     """Implements CandleHistoryPort via Capital.com /prices REST endpoint.
 
-    Uses separate bid and ask requests and merges them by timestamp.
+    A single /prices request already returns bid and ask for every OHLC point,
+    so there is no per-priceType fan-out: each record carries openPrice,
+    closePrice, highPrice and lowPrice, each with .bid and .ask.
 
-    epic_resolution_map: maps (epic, resolution) -> period_seconds; used only
-    to align the 'to' timestamp for gap-fills. May be empty for tests that
-    don't exercise gap-fills requiring period derivation.
+    epic_resolution_map: maps (epic, resolution) -> period_seconds; reserved for
+    callers that need period derivation. May be empty.
     """
 
     def __init__(
@@ -64,15 +67,10 @@ class CapitalCandleHistory(CandleHistoryPort):
         auth_headers: dict[str, str],
     ) -> Sequence[CandleRow]:
         fetch_count = count + 1
-        base_url = f"{self._base_url}/prices/{epic}?resolution={resolution}&max={fetch_count}"
-
-        bid_records = self._fetch_prices(base_url + "&priceType=bid", auth_headers)
-        ask_records = self._fetch_prices(base_url + "&priceType=ask", auth_headers)
-
-        bid_closed = bid_records[:-1]
-        ask_closed = ask_records[:-1]
-
-        return _merge_to_rows(epic, resolution, bid_closed, ask_closed)
+        url = f"{self._base_url}/prices/{epic}?resolution={resolution}&max={fetch_count}"
+        records = self._fetch_prices(url, auth_headers)
+        closed = records[:-1]
+        return _to_rows(epic, resolution, closed)
 
     def _gap_fill(
         self,
@@ -83,15 +81,12 @@ class CapitalCandleHistory(CandleHistoryPort):
     ) -> Sequence[CandleRow]:
         from_iso = _to_iso(since)
         to_iso = _now_iso()
-        base_url = (
+        url = (
             f"{self._base_url}/prices/{epic}"
             f"?resolution={resolution}&from={from_iso}&to={to_iso}"
         )
-
-        bid_records = self._fetch_prices(base_url + "&priceType=bid", auth_headers)
-        ask_records = self._fetch_prices(base_url + "&priceType=ask", auth_headers)
-
-        return _merge_to_rows(epic, resolution, bid_records, ask_records)
+        records = self._fetch_prices(url, auth_headers)
+        return _to_rows(epic, resolution, records)
 
     def _fetch_prices(self, url: str, auth_headers: dict[str, str]) -> list[dict]:
         response = self._http.get(url, headers=auth_headers)
@@ -99,31 +94,33 @@ class CapitalCandleHistory(CandleHistoryPort):
         return response.json().get("prices", [])
 
 
-def _merge_to_rows(
+def _parse_snapshot(record: dict) -> datetime:
+    naive = datetime.strptime(record["snapshotTimeUTC"], _SNAPSHOT_UTC_FORMAT)
+    return naive.replace(tzinfo=timezone.utc)
+
+
+def _to_rows(
     epic: str,
     resolution: str,
-    bid_records: list[dict],
-    ask_records: list[dict],
+    records: list[dict],
 ) -> list[CandleRow]:
-    ask_by_t = {r["t"]: r for r in ask_records}
     rows: list[CandleRow] = []
-    for bid in bid_records:
-        t_ms = bid["t"]
-        ask = ask_by_t.get(t_ms)
-        if ask is None:
-            continue
-        candle_start = datetime.fromtimestamp(t_ms / 1000, tz=timezone.utc)
+    for record in records:
+        open_price = record["openPrice"]
+        high_price = record["highPrice"]
+        low_price = record["lowPrice"]
+        close_price = record["closePrice"]
         rows.append(CandleRow(
             epic=epic,
             resolution=resolution,
-            candle_start=candle_start,
-            open_bid=float(bid["o"]),
-            high_bid=float(bid["h"]),
-            low_bid=float(bid["l"]),
-            close_bid=float(bid["c"]),
-            open_ask=float(ask["o"]),
-            high_ask=float(ask["h"]),
-            low_ask=float(ask["l"]),
-            close_ask=float(ask["c"]),
+            candle_start=_parse_snapshot(record),
+            open_bid=float(open_price["bid"]),
+            high_bid=float(high_price["bid"]),
+            low_bid=float(low_price["bid"]),
+            close_bid=float(close_price["bid"]),
+            open_ask=float(open_price["ask"]),
+            high_ask=float(high_price["ask"]),
+            low_ask=float(low_price["ask"]),
+            close_ask=float(close_price["ask"]),
         ))
     return rows

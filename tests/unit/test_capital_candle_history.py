@@ -13,14 +13,13 @@ _BASE = "https://demo-api-capital.backend-capital.com/api/v1"
 _EPIC = "EURUSD"
 _RESOLUTION = "MINUTE"
 
-_T1_MS = 1_700_000_000_000
+_T1_ISO = "2023-11-14T22:13:20"
 _T1_DT = datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
-_T2_MS = _T1_MS + 60_000
+_T2_ISO = "2023-11-14T22:14:20"
 _T2_DT = datetime(2023, 11, 14, 22, 14, 20, tzinfo=timezone.utc)
-_T3_MS = _T2_MS + 60_000
+_T3_ISO = "2023-11-14T22:15:20"
 _T3_DT = datetime(2023, 11, 14, 22, 15, 20, tzinfo=timezone.utc)
-_T4_MS = _T3_MS + 60_000
-_T4_DT = datetime(2023, 11, 14, 22, 16, 20, tzinfo=timezone.utc)
+_T4_ISO = "2023-11-14T22:16:20"
 
 
 class _FakeSession:
@@ -28,24 +27,31 @@ class _FakeSession:
         return SessionTokens(cst="test-cst", security_token="test-xst")
 
 
-def _price_item(t_ms: int, price: float = 1.1000) -> dict:
+def _price_item(snapshot_utc: str, bid: float = 1.1000, ask: float = 1.1010) -> dict:
+    """Mirrors the real /prices record shape verified against Capital demo."""
     return {
-        "t": t_ms,
-        "o": price,
-        "h": price + 0.001,
-        "l": price - 0.001,
-        "c": price + 0.0005,
+        "snapshotTime": snapshot_utc,
+        "snapshotTimeUTC": snapshot_utc,
+        "openPrice": {"bid": bid, "ask": ask},
+        "closePrice": {"bid": bid + 0.0005, "ask": ask + 0.0005},
+        "highPrice": {"bid": bid + 0.001, "ask": ask + 0.001},
+        "lowPrice": {"bid": bid - 0.001, "ask": ask - 0.001},
+        "lastTradedVolume": 42,
     }
 
 
-def _prices_body(items: list[dict], price_type: str = "bid") -> dict:
-    return {"prices": items, "priceType": price_type}
+def _prices_body(items: list[dict]) -> dict:
+    return {
+        "prices": items,
+        "instrumentType": "CURRENCIES",
+        "tickSize": 1e-05,
+        "pipPosition": 4,
+    }
 
 
-def _make_adapter(bid_responses: list[dict], ask_responses: list[dict]) -> tuple[CapitalCandleHistory, FakeHttp]:
-    bid_canns = [CannedResponse(status_code=200, json_body=b) for b in bid_responses]
-    ask_canns = [CannedResponse(status_code=200, json_body=a) for a in ask_responses]
-    http = FakeHttp(bid_canns + ask_canns)
+def _make_adapter(responses: list[dict]) -> tuple[CapitalCandleHistory, FakeHttp]:
+    canns = [CannedResponse(status_code=200, json_body=b) for b in responses]
+    http = FakeHttp(canns)
     return CapitalCandleHistory(
         session=_FakeSession(),
         http=http,
@@ -54,28 +60,23 @@ def _make_adapter(bid_responses: list[dict], ask_responses: list[dict]) -> tuple
     ), http
 
 
-def test_cold_backfill_calls_max_param():
-    # API is called with count+1 so the last in-formation record can be dropped.
-    items = [_price_item(_T1_MS), _price_item(_T2_MS), _price_item(_T3_MS), _price_item(_T4_MS)]
-    bid_body = _prices_body(items)
-    ask_body = _prices_body([_price_item(i["t"], 1.1010) for i in items], "ask")
-    adapter, http = _make_adapter([bid_body], [ask_body])
+def test_cold_backfill_calls_max_param_once_no_price_type():
+    items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO), _price_item(_T4_ISO)]
+    adapter, http = _make_adapter([_prices_body(items)])
 
     rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=3, since=None)
 
     assert len(rows) == 3
-    bid_call = http.calls[0]
-    ask_call = http.calls[1]
-    assert "max=4" in bid_call[1]
-    assert "max=4" in ask_call[1]
-    assert "resolution=MINUTE" in bid_call[1]
+    assert len(http.calls) == 1
+    _, url, _ = http.calls[0]
+    assert "max=4" in url
+    assert "resolution=MINUTE" in url
+    assert "priceType" not in url
 
 
 def test_cold_backfill_drops_last_in_formation_record():
-    items = [_price_item(_T1_MS), _price_item(_T2_MS), _price_item(_T3_MS)]
-    bid_body = _prices_body(items)
-    ask_body = _prices_body([_price_item(t["t"], 1.1010) for t in items], "ask")
-    adapter, _ = _make_adapter([bid_body], [ask_body])
+    items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO)]
+    adapter, _ = _make_adapter([_prices_body(items)])
 
     rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=2, since=None)
 
@@ -85,14 +86,9 @@ def test_cold_backfill_drops_last_in_formation_record():
 
 
 def test_cold_backfill_returns_candle_rows_with_correct_fields():
-    bid_price = 1.1000
-    ask_price = 1.1010
-    # send count+1=2 records so the last (in-formation) is dropped and 1 remains
-    items_bid = [_price_item(_T1_MS, bid_price), _price_item(_T2_MS, bid_price)]
-    items_ask = [_price_item(_T1_MS, ask_price), _price_item(_T2_MS, ask_price)]
-    bid_body = _prices_body(items_bid)
-    ask_body = _prices_body(items_ask, "ask")
-    adapter, _ = _make_adapter([bid_body], [ask_body])
+    bid, ask = 1.1000, 1.1010
+    items = [_price_item(_T1_ISO, bid, ask), _price_item(_T2_ISO, bid, ask)]
+    adapter, _ = _make_adapter([_prices_body(items)])
 
     rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=1, since=None)
 
@@ -102,33 +98,34 @@ def test_cold_backfill_returns_candle_rows_with_correct_fields():
     assert row.epic == _EPIC
     assert row.resolution == _RESOLUTION
     assert row.candle_start == _T1_DT
-    assert row.open_bid == pytest.approx(bid_price)
-    assert row.open_ask == pytest.approx(ask_price)
+    assert row.open_bid == pytest.approx(bid)
+    assert row.open_ask == pytest.approx(ask)
+    assert row.close_bid == pytest.approx(bid + 0.0005)
+    assert row.close_ask == pytest.approx(ask + 0.0005)
+    assert row.high_bid == pytest.approx(bid + 0.001)
+    assert row.low_ask == pytest.approx(ask - 0.001)
 
 
-def test_gap_fill_calls_from_to_params():
+def test_gap_fill_calls_from_to_params_once():
     since = datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
-    now_approx = "2023-11-14"
-    items = [_price_item(_T2_MS)]
-    bid_body = _prices_body(items)
-    ask_body = _prices_body([_price_item(_T2_MS, 1.1010)], "ask")
-    adapter, http = _make_adapter([bid_body], [ask_body])
+    items = [_price_item(_T2_ISO)]
+    adapter, http = _make_adapter([_prices_body(items)])
 
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=5, since=since)
+    adapter.fetch_history(_EPIC, _RESOLUTION, count=5, since=since)
 
-    bid_call = http.calls[0]
-    assert "from=2023-11-14T22:13:20" in bid_call[1]
-    assert "to=" in bid_call[1]
-    assert "max=" not in bid_call[1]
+    assert len(http.calls) == 1
+    _, url, _ = http.calls[0]
+    assert "from=2023-11-14T22:13:20" in url
+    assert "to=" in url
+    assert "max=" not in url
+    assert "priceType" not in url
 
 
 def test_gap_fill_returns_rows_without_dropping_last():
-    items = [_price_item(_T1_MS), _price_item(_T2_MS), _price_item(_T3_MS)]
-    bid_body = _prices_body(items)
-    ask_body = _prices_body([_price_item(i["t"], 1.1010) for i in items], "ask")
-    adapter, _ = _make_adapter([bid_body], [ask_body])
+    items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO)]
+    adapter, _ = _make_adapter([_prices_body(items)])
 
-    since = _T1_DT
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=10, since=since)
+    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=10, since=_T1_DT)
 
     assert len(rows) == 3
+    assert rows[2].candle_start == _T3_DT
