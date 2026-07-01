@@ -44,6 +44,8 @@ class CapitalCandleHistory(CandleHistoryPort):
 
     def fetch_history(
         self,
+        *,
+        provider: str = "capital",
         epic: str,
         resolution: str,
         count: int,

@@ -64,7 +64,7 @@ def test_cold_backfill_calls_max_param_once_no_price_type():
     items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO), _price_item(_T4_ISO)]
     adapter, http = _make_adapter([_prices_body(items)])
 
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=3, since=None)
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=3, since=None)
 
     assert len(rows) == 3
     assert len(http.calls) == 1
@@ -78,7 +78,7 @@ def test_cold_backfill_drops_last_in_formation_record():
     items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO)]
     adapter, _ = _make_adapter([_prices_body(items)])
 
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=2, since=None)
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=2, since=None)
 
     assert len(rows) == 2
     assert rows[0].candle_start == _T1_DT
@@ -90,7 +90,7 @@ def test_cold_backfill_returns_candle_rows_with_correct_fields():
     items = [_price_item(_T1_ISO, bid, ask), _price_item(_T2_ISO, bid, ask)]
     adapter, _ = _make_adapter([_prices_body(items)])
 
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=1, since=None)
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=1, since=None)
 
     assert len(rows) == 1
     row = rows[0]
@@ -111,7 +111,7 @@ def test_gap_fill_calls_from_to_params_once():
     items = [_price_item(_T2_ISO)]
     adapter, http = _make_adapter([_prices_body(items)])
 
-    adapter.fetch_history(_EPIC, _RESOLUTION, count=5, since=since)
+    adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=5, since=since)
 
     assert len(http.calls) == 1
     _, url, _ = http.calls[0]
@@ -125,7 +125,7 @@ def test_gap_fill_returns_rows_without_dropping_last():
     items = [_price_item(_T1_ISO), _price_item(_T2_ISO), _price_item(_T3_ISO)]
     adapter, _ = _make_adapter([_prices_body(items)])
 
-    rows = adapter.fetch_history(_EPIC, _RESOLUTION, count=10, since=_T1_DT)
+    rows = adapter.fetch_history(epic=_EPIC, resolution=_RESOLUTION, count=10, since=_T1_DT)
 
     assert len(rows) == 3
     assert rows[2].candle_start == _T3_DT
