@@ -68,6 +68,7 @@ if __name__ == "__main__":
         http=_http,
         base_url=_config.base_url,
         epic_resolution_map=_period_seconds,
+        provider=_config.provider,
     )
     _ingester = CapitalWsIngester(
         session=_capital_session,
@@ -80,6 +81,7 @@ if __name__ == "__main__":
         period_seconds=_period_seconds,
         ws_ping_interval_seconds=_config.ws_ping_interval_seconds,
         required_candles=_config.required_candles,
+        provider=_config.provider,
     )
 
     run_ingestion_forever(_ingester)

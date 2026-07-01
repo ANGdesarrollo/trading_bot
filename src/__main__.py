@@ -91,6 +91,7 @@ def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None
             candle_store=candle_store,
             resolution=config.timeframe,
             journal=journal,
+            provider=config.provider,
         )
         for sc in config.symbols
     ]

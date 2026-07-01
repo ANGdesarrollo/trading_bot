@@ -33,6 +33,7 @@ def _make_config():
     config.poll_minutes = 15
     config.candle_settle_seconds = 0
     config.symbols = [MagicMock(symbol="EURUSD", epic="CS.D.EURUSD.MINI.IP", size=1000.0)]
+    config.provider = "ic_markets"
     return config
 
 
@@ -50,6 +51,18 @@ def test_use_case_receives_candle_store_not_broker_candles():
     assert hasattr(uc, "_candle_store")
     assert uc._candle_store is store
     assert not hasattr(uc, "_freshness_max_retries")
+
+
+def test_use_case_receives_provider_from_config():
+    config = _make_config()
+    journal = FakeJournalPort()
+    store = FakeCandleStore()
+
+    use_cases, _ = build_use_cases(
+        config, MagicMock(), MagicMock(), journal=journal, candle_store=store
+    )
+
+    assert use_cases[0]._provider == "ic_markets"
 
 
 def test_use_case_has_no_freshness_params():
