@@ -26,6 +26,17 @@ services:
       postgres:
         condition: service_healthy
 
+  ingestion:
+    build: .
+    command: ["python", "src/ingestion.py"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   reconciler:
     build: .
     command: ["python", "src/reconciler.py"]
