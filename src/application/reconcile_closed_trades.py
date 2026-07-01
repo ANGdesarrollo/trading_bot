@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from domain.entities.journal import JournalResult
 from domain.ports.trade_history_port import TradeHistoryPort
 from domain.ports.trade_journal_port import TradeJournalPort
+from domain.services.close_source import derive_close_source
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,15 @@ class ReconcileClosedTradesUseCase:
                     closed.realized_pnl, closed.fees,
                     entry.sl_distance, entry.position_size,
                 )
+                derived_source = derive_close_source(
+                    closed.close_source, closed.close_price,
+                    entry.filled_price, entry.sl_distance, entry.tp_distance, entry.direction,
+                )
                 self._journal.record_result(JournalResult(
                     deal_id=entry.deal_id,
                     closed_at=closed.closed_at,
                     close_price=closed.close_price,
-                    close_source=closed.close_source,
+                    close_source=derived_source,
                     realized_pnl=closed.realized_pnl,
                     fees=closed.fees,
                     realized_r=realized_r,

@@ -10,7 +10,7 @@ logs:
 	docker compose logs -f
 
 operator:
-	cd src && ../.venv/bin/python3 -m src
+	PYTHONPATH=src .venv/bin/python3 src/__main__.py
 
 reconciler:
-	cd src && ../.venv/bin/python3 -m reconciler
+	PYTHONPATH=src .venv/bin/python3 src/reconciler.py

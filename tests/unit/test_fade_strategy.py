@@ -8,7 +8,6 @@ Scenarios:
 """
 
 import math
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -16,14 +15,10 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-_BACKEND_ROOT = Path(__file__).parents[3] / "backend"
-if str(_BACKEND_ROOT) not in sys.path:
-    sys.path.append(str(_BACKEND_ROOT))
-
 from domain.adapters.fade_strategy import FadeStrategy
 from domain.entities.candle import Candle
 from domain.entities.direction import Direction
-from research.lib.fade_strategy import (
+from domain.strategy.fade import (
     ATR_PERIOD,
     MIN_DISP_ATR,
     MIN_STRAIGHTNESS,
@@ -32,7 +27,7 @@ from research.lib.fade_strategy import (
     _aggressive_episodes,
     simulate_fades,
 )
-from research.lib.runs import compute_atr
+from domain.strategy.runs import compute_atr
 
 
 def _make_candles(opens, highs, lows, closes) -> list[Candle]:
@@ -79,7 +74,7 @@ def test_non_aggressive_bar_returns_none():
     assert result is None
 
 
-def _build_aggressive_window():
+def _build_aggressive_window(path: Path):
     """Build 128 candles whose bar n-2 (index 126) is an aggressive down-run endpoint.
 
     Loads a known slice from the real EURUSD fixture where simulate_fades produces a
@@ -88,14 +83,7 @@ def _build_aggressive_window():
     """
     import pandas as pd
 
-    csv_path = (
-        Path(__file__).parents[3]
-        / "backend"
-        / "research"
-        / "data"
-        / "eurusd_15m.csv"
-    )
-    df = pd.read_csv(csv_path, parse_dates=["datetime"])
+    df = pd.read_csv(path, parse_dates=["datetime"])
     df = df.rename(columns={"datetime": "datetime"})
     df = df.set_index("datetime").sort_index()
     df = df[["open", "high", "low", "close"]].dropna()
@@ -152,8 +140,8 @@ def _build_aggressive_window():
     return candles, trade.direction, atr_at_endpoint, trade
 
 
-def test_aggressive_bar_produces_valid_signal():
-    candles, bt_direction, _atr_e_full_series, trade = _build_aggressive_window()
+def test_aggressive_bar_produces_valid_signal(eurusd_fixture_path):
+    candles, bt_direction, _atr_e_full_series, trade = _build_aggressive_window(eurusd_fixture_path)
     strategy = FadeStrategy()
     signal = strategy.evaluate(candles)
 
@@ -170,8 +158,8 @@ def test_aggressive_bar_produces_valid_signal():
     assert abs(tp_dist - RR * sl_dist) < 1e-9
 
 
-def test_build_signal_returns_relative_distances():
-    candles, _bt_direction, _atr_e, _trade = _build_aggressive_window()
+def test_build_signal_returns_relative_distances(eurusd_fixture_path):
+    candles, _bt_direction, _atr_e, _trade = _build_aggressive_window(eurusd_fixture_path)
     strategy = FadeStrategy()
     signal = strategy.evaluate(candles)
 
@@ -190,18 +178,13 @@ def test_build_signal_returns_relative_distances():
     assert signal.tp_distance == pytest.approx(RR * signal.sl_distance)
 
 
-def test_zero_atr_returns_none(monkeypatch):
+def test_zero_atr_returns_none(eurusd_fixture_path, monkeypatch):
     """If atr at the episode bar is 0 or NaN, evaluate must return None."""
     import pandas as pd
 
-    csv_path = (
-        Path(__file__).parents[3]
-        / "backend"
-        / "research"
-        / "data"
-        / "eurusd_15m.csv"
-    )
-    df = pd.read_csv(csv_path, parse_dates=["datetime"])
+    path = eurusd_fixture_path
+
+    df = pd.read_csv(path, parse_dates=["datetime"])
     df = df.rename(columns={"datetime": "datetime"})
     df = df.set_index("datetime").sort_index()
     df = df[["open", "high", "low", "close"]].dropna()

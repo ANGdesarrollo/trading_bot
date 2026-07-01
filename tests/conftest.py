@@ -1,13 +1,17 @@
-"""Test configuration.
-
-Adds the backend research package to sys.path so tests and the FadeStrategy adapter
-can import `research.lib.*`. This coupling is deliberate (anti-drift guarantee) and
-isolated here — no other file should manipulate sys.path.
-"""
-
-import sys
+import os
 from pathlib import Path
 
-_BACKEND_ROOT = Path(__file__).parents[3] / "backend"
-if str(_BACKEND_ROOT) not in sys.path:
-    sys.path.append(str(_BACKEND_ROOT))
+import pytest
+
+_FIXTURE_ENV = "EURUSD_FIXTURE_PATH"
+
+
+@pytest.fixture(scope="module")
+def eurusd_fixture_path() -> Path:
+    raw = os.environ.get(_FIXTURE_ENV)
+    if not raw:
+        pytest.skip(f"{_FIXTURE_ENV} not set or file missing")
+    path = Path(raw)
+    if not path.exists():
+        pytest.skip(f"{_FIXTURE_ENV} not set or file missing")
+    return path

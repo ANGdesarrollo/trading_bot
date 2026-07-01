@@ -21,21 +21,16 @@ rejects. Verified by h19 windowed-ATR sweep (ATR edge plateaus at N=128).
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-_BACKEND_ROOT = Path(__file__).parents[3] / "backend"
-if str(_BACKEND_ROOT) not in sys.path:
-    sys.path.append(str(_BACKEND_ROOT))
-
 from domain.adapters.fade_strategy import FadeStrategy
 from domain.entities.candle import Candle
 from domain.entities.direction import Direction
-from research.lib.fade_strategy import (
+from domain.strategy.fade import (
     ATR_PERIOD,
     DIR_THRESHOLD_FROZEN,
     L_FROZEN,
@@ -43,22 +38,14 @@ from research.lib.fade_strategy import (
     SL_ATR_MULT,
     simulate_fades,
 )
-from research.lib.runs import compute_atr, identify_runs
-from research.lib.trajectory import extract_trajectory_features
+from domain.strategy.runs import compute_atr, identify_runs
+from domain.strategy.trajectory import extract_trajectory_features
 
 _REQUIRED = 128
 
-_CSV_PATH = (
-    Path(__file__).parents[3]
-    / "backend"
-    / "research"
-    / "data"
-    / "eurusd_15m.csv"
-)
 
-
-def _load_df() -> pd.DataFrame:
-    df = pd.read_csv(_CSV_PATH, parse_dates=["datetime"])
+def _load_df(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path, parse_dates=["datetime"])
     df = df.set_index("datetime").sort_index()
     return df[["open", "high", "low", "close"]].dropna().reset_index(drop=True)
 
@@ -108,10 +95,8 @@ def _gate_features_in_slice(
 
 
 @pytest.fixture(scope="module")
-def fixture_data():
-    if not _CSV_PATH.exists():
-        pytest.skip("EURUSD 15m CSV not found; wire real data to enable this test")
-    df = _load_df()
+def fixture_data(eurusd_fixture_path):
+    df = _load_df(eurusd_fixture_path)
     trades = simulate_fades(df, cost_pct=0.0)
     return df, trades
 

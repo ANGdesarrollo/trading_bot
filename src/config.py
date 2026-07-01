@@ -1,14 +1,15 @@
-"""Trading engine configuration.
+"""Trading engine configuration — single source of truth for all runtime parameters.
 
-Single source of truth for all runtime parameters. Frozen strategy constants
-(L_FROZEN, ATR_PERIOD, etc.) live ONLY in research.lib.fade_strategy and are
-imported by the domain adapter — never duplicated here.
+Frozen strategy constants (L_FROZEN, ATR_PERIOD, etc.) live ONLY in
+domain.strategy.fade (vendored) and are imported by the domain adapter — never
+duplicated here.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Sequence
 
 from dotenv import load_dotenv
 
@@ -33,16 +34,21 @@ def _resolve_base_url(mode: str) -> str:
 
 
 @dataclass(frozen=True)
+class SymbolConfig:
+    symbol: str
+    epic: str
+    size: float
+
+
+@dataclass(frozen=True)
 class Config:
     mode: str
     base_url: str
     api_key: str
     identifier: str
     password: str
-    symbol: str
-    epics: dict[str, str]
+    symbols: tuple[SymbolConfig, ...]
     timeframe: str
-    trade_size: float
     warmup_bars: int
     candle_settle_seconds: int
     poll_minutes: int
@@ -50,35 +56,70 @@ class Config:
     freshness_retry_seconds: float
     database_url: str
 
+    @property
+    def epics(self) -> dict[str, str]:
+        return {s.symbol: s.epic for s in self.symbols}
+
+
+def _parse_symbols(env: dict[str, str]) -> list[SymbolConfig]:
+    raw = env.get("SYMBOLS", "").strip()
+    if not raw:
+        raise ValueError("SYMBOLS environment variable is required and must not be empty")
+
+    names = [s.strip() for s in raw.split(",") if s.strip()]
+    if not names:
+        raise ValueError("SYMBOLS environment variable is required and must not be empty")
+
+    seen: set[str] = set()
+    for name in names:
+        if name in seen:
+            raise ValueError(f"Duplicate symbol in SYMBOLS: {name}")
+        seen.add(name)
+
+    global_size = float(env.get("SIZE", "1000"))
+
+    result: list[SymbolConfig] = []
+    for name in names:
+        epic = env.get(f"EPIC_{name}", "").strip()
+        if not epic:
+            raise ValueError(
+                f"Missing or blank EPIC_{name}: every listed symbol requires an explicit epic"
+            )
+        size = float(env.get(f"SIZE_{name}", str(global_size)))
+        result.append(SymbolConfig(symbol=name, epic=epic, size=size))
+
+    return result
+
 
 def load_config() -> Config:
-    mode = os.environ.get("MODE", "demo").lower()
+    env = dict(os.environ)
+
+    mode = env.get("MODE", "demo").lower()
     base_url = _resolve_base_url(mode)
 
-    api_key = os.environ.get("CAPITAL_API_KEY", "")
-    identifier = os.environ.get("IDENTIFIER", "")
-    password = os.environ.get("PASSWORD", "")
-    symbol = os.environ.get("SYMBOL", "EURUSD")
-    epic = os.environ.get("EPIC", "")
-    timeframe = os.environ.get("TIMEFRAME", "MINUTE_15")
-    trade_size = float(os.environ.get("SIZE", "1000"))
-    warmup_bars = int(os.environ.get("WARMUP", str(WARMUP_BARS)))
-    candle_settle_seconds = int(os.environ.get("CANDLE_SETTLE_SECONDS", "5"))
-    poll_minutes = int(os.environ.get("POLL_MINUTES", "15"))
-    freshness_max_retries = int(os.environ.get("FRESHNESS_MAX_RETRIES", "3"))
-    freshness_retry_seconds = float(os.environ.get("FRESHNESS_RETRY_SECONDS", "2.0"))
+    api_key = env.get("CAPITAL_API_KEY", "")
+    identifier = env.get("IDENTIFIER", "")
+    password = env.get("PASSWORD", "")
+    database_url = env.get("DATABASE_URL", "")
+    timeframe = env.get("TIMEFRAME", "MINUTE_15")
+    warmup_bars = int(env.get("WARMUP", str(WARMUP_BARS)))
+    candle_settle_seconds = int(env.get("CANDLE_SETTLE_SECONDS", "5"))
+    poll_minutes = int(env.get("POLL_MINUTES", "15"))
+    freshness_max_retries = int(env.get("FRESHNESS_MAX_RETRIES", "3"))
+    freshness_retry_seconds = float(env.get("FRESHNESS_RETRY_SECONDS", "2.0"))
 
-    database_url = os.environ.get("DATABASE_URL", "")
-
-    missing = [name for name, val in [
-        ("CAPITAL_API_KEY", api_key), ("IDENTIFIER", identifier),
-        ("PASSWORD", password), ("EPIC", epic),
+    missing_shared = [name for name, val in [
+        ("CAPITAL_API_KEY", api_key),
+        ("IDENTIFIER", identifier),
+        ("PASSWORD", password),
         ("DATABASE_URL", database_url),
     ] if not val]
-    if missing:
+    if missing_shared:
         raise SystemExit(
-            f"Missing required environment variables: {', '.join(missing)}"
+            f"Missing required environment variables: {', '.join(missing_shared)}"
         )
+
+    symbols = tuple(_parse_symbols(env))
 
     return Config(
         mode=mode,
@@ -86,10 +127,8 @@ def load_config() -> Config:
         api_key=api_key,
         identifier=identifier,
         password=password,
-        symbol=symbol,
-        epics={symbol: epic},
+        symbols=symbols,
         timeframe=timeframe,
-        trade_size=trade_size,
         warmup_bars=warmup_bars,
         candle_settle_seconds=candle_settle_seconds,
         poll_minutes=poll_minutes,

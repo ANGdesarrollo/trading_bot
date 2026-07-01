@@ -7,6 +7,21 @@ from domain.ports.trade_history_port import TradeHistoryPort
 from infrastructure.capital.session import CapitalSession
 
 
+_ACTIVITY_SOURCE_TO_CLOSE_SOURCE: dict[str, str] = {
+    "USER": "USER",
+    "CLOSE_OUT": "CLOSE_OUT",
+    # Capital.com "SYSTEM" covers both SL and TP; disambiguation happens in the
+    # reconciler via derive_close_source, so the adapter passes the raw value through.
+    "SYSTEM": "SYSTEM",
+}
+
+_CLOSE_SOURCE_FALLBACK = "USER"
+
+
+def _map_close_source(activity_source: str) -> str:
+    return _ACTIVITY_SOURCE_TO_CLOSE_SOURCE.get(activity_source, _CLOSE_SOURCE_FALLBACK)
+
+
 def _to_iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
@@ -59,7 +74,7 @@ class CapitalTradeHistory(TradeHistoryPort):
             deal_id=deal_id,
             closed_at=closed_at,
             close_price=float(match["level"]),
-            close_source=match["type"],
+            close_source=_map_close_source(match.get("source", "")),
             realized_pnl=float(tx["profitAndLoss"]),
             fees=float(tx["commission"]),
         )

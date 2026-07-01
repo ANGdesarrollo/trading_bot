@@ -45,7 +45,7 @@ def seconds_until_next_boundary(now: datetime, period_minutes: int) -> float:
     return float(wait)
 
 
-def build_use_case(config, http, clock, journal: TradeJournalPort | None = None):
+def build_use_cases(config, http, clock, journal: TradeJournalPort | None = None):
     session = CapitalSession(
         http=http,
         base_url=config.base_url,
@@ -70,35 +70,44 @@ def build_use_case(config, http, clock, journal: TradeJournalPort | None = None)
         conn = connect(config.database_url)
         run_migrations(conn)
         journal = PostgresTradeJournal(conn)
-    use_case = RunTradingCycleUseCase(
-        broker=broker,
-        strategy=strategy,
-        symbol=config.symbol,
-        size=config.trade_size,
-        logger=logger,
-        clock=clock,
-        poll_minutes=config.poll_minutes,
-        freshness_max_retries=config.freshness_max_retries,
-        freshness_retry_seconds=config.freshness_retry_seconds,
-        journal=journal,
-    )
-    return use_case, session
+    use_cases = [
+        RunTradingCycleUseCase(
+            broker=broker,
+            strategy=strategy,
+            symbol=sc.symbol,
+            size=sc.size,
+            logger=logger,
+            clock=clock,
+            poll_minutes=config.poll_minutes,
+            freshness_max_retries=config.freshness_max_retries,
+            freshness_retry_seconds=config.freshness_retry_seconds,
+            journal=journal,
+        )
+        for sc in config.symbols
+    ]
+    return use_cases, session
 
 
-def run_forever(config, use_case, session, clock) -> None:
+def run_forever(config, use_cases, session, clock) -> None:
     while True:
         wait = seconds_until_next_boundary(clock.utcnow(), config.poll_minutes)
         clock.sleep(wait + config.candle_settle_seconds)
         try:
             session.authenticate()
-            use_case.execute()
         except Exception:
-            logger.exception("cycle failed; continuing to next boundary")
+            logger.exception("authentication failed; skipping boundary")
+            continue
+        for use_case in use_cases:
+            try:
+                use_case.execute()
+            except Exception:
+                symbol = getattr(use_case, "_symbol", "unknown")
+                logger.exception("cycle failed for %s; continuing", symbol)
 
 
 if __name__ == "__main__":
     config = load_config()
     http = requests.Session()
     clock = SystemClock()
-    use_case, session = build_use_case(config, http, clock)
-    run_forever(config, use_case, session, clock)
+    use_cases, session = build_use_cases(config, http, clock)
+    run_forever(config, use_cases, session, clock)

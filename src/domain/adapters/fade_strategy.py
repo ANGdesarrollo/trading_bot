@@ -1,33 +1,25 @@
-"""FadeStrategy — bridges the frozen research lib to StrategyPort.
+"""FadeStrategy — bridges the vendored frozen strategy to StrategyPort.
 
-Coupling note: this adapter intentionally imports from `research.lib.*` in the
-backend project. That cross-project import is the anti-drift guarantee: the live
-path calls the IDENTICAL code the backtest validated. The sys.path shim below
-keeps this coupling isolated to one module; nothing else in capital_integration
-should touch sys.path.
+Coupling note: this adapter imports from `domain.strategy.*`, the vendored copy
+of the frozen fade strategy. The same code powers both the research backtest and
+the live adapter, so the painted trades are exactly the trades that were validated.
 """
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Sequence
 from math import isnan
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-_BACKEND_ROOT = Path(__file__).parents[4] / "backend"
-if str(_BACKEND_ROOT) not in sys.path:
-    sys.path.append(str(_BACKEND_ROOT))
-
-from research.lib.fade_strategy import (
+from domain.strategy.fade import (
     ATR_PERIOD,
     RR,
     SL_ATR_MULT,
     _aggressive_episodes,
 )
-from research.lib.runs import compute_atr
+from domain.strategy.runs import compute_atr
 
 from domain.entities.candle import Candle
 from domain.entities.direction import Direction

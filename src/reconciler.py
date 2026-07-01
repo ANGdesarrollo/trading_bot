@@ -1,10 +1,3 @@
-"""Reconciler process — composition root and 60-second loop.
-
-Runs as a separate OS process from the operator. Connects to Capital.com and
-Postgres, then polls at 60-second cadence to fill result columns for entries
-the operator has written but not yet reconciled.
-"""
-
 from __future__ import annotations
 
 import logging

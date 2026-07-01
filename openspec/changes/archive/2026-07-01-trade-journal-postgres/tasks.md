@@ -318,7 +318,7 @@ def connect(database_url: str):
 
 ## Group F — Operator Wiring
 
-### T-07 · Wire journal into RunTradingCycleUseCase (best-effort record_entry)
+### [x] T-07 · Wire journal into RunTradingCycleUseCase (best-effort record_entry)
 
 **Spec**: REQ-05, REQ-06, Scenarios 3.1–3.3
 **Files**: `src/application/trading_cycle.py`, `tests/unit/test_trading_cycle.py`
@@ -367,7 +367,7 @@ Run: `FAIL` — `RunTradingCycleUseCase` has no `journal` parameter.
 
 ---
 
-### T-08 · Wire journal into operator composition root
+### [x] T-08 · Wire journal into operator composition root
 
 **Spec**: REQ-15, REQ-18, Scenario 8.1
 **Files**: `src/__main__.py`
@@ -382,7 +382,7 @@ Run: `FAIL` — `RunTradingCycleUseCase` has no `journal` parameter.
 
 ---
 
-### T-09 · Integration test — Postgres journal round-trip
+### [x] T-09 · Integration test — Postgres journal round-trip
 
 **Spec**: Scenarios 1.1–1.4, 4.1–4.2 (real DB)
 **Files**: `tests/integration/test_postgres_journal.py`
@@ -432,7 +432,7 @@ Run (with DATABASE_URL pointing at docker postgres): `FAIL` — table does not e
 
 ## Group G — Reconciler Path
 
-### T-10 · ReconcileClosedTradesUseCase
+### [x] T-10 · ReconcileClosedTradesUseCase
 
 **Spec**: REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, Scenarios 4.1–4.2, 5.1–5.4
 **Files**: `src/application/reconcile_closed_trades.py`, `tests/unit/test_reconcile_use_case.py`
@@ -533,7 +533,7 @@ class ReconcileClosedTradesUseCase:
 
 ---
 
-### T-11 · CapitalTradeHistory adapter
+### [x] T-11 · CapitalTradeHistory adapter
 
 **Spec**: REQ-08 (TradeHistoryPort impl)
 **Files**: `src/infrastructure/capital/history_adapter.py`
@@ -578,7 +578,7 @@ Run: `FAIL` — `CapitalTradeHistory` does not exist.
 
 ---
 
-### T-12 · Reconciler entrypoint (composition root + 1-min loop)
+### [x] T-12 · Reconciler entrypoint (composition root + 1-min loop)
 
 **Spec**: REQ-12, REQ-13, REQ-14, Scenario 6.1
 **Files**: `src/reconciler.py`, `tests/unit/test_reconciler_loop.py`
@@ -622,7 +622,7 @@ Run: `FAIL` — `_run_one_cycle` / `run_reconciler_forever` does not exist.
 
 ## Group H — Infrastructure Bring-up
 
-### T-13 · docker-compose.yml + Makefile
+### [x] T-13 · docker-compose.yml + Makefile
 
 **Spec**: REQ-19, REQ-20
 **Files**: `docker-compose.yml`, `Makefile` (both in `operator/`)

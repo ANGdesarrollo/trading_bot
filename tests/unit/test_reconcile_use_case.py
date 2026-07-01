@@ -84,9 +84,56 @@ def test_realized_r_losing_trade():
     assert r.realized_r == pytest.approx((-20.0 - 1.0) / (0.0020 * 10000.0))
 
 
+def test_realized_r_sell_win():
+    entry = _make_entry("D1", filled_price=1.12, sl_distance=0.0020,
+                        position_size=10000.0, direction="SELL")
+    journal = FakeJournalPort(open_=[entry])
+    history = FakeTradeHistoryPort({"D1": _make_closed("D1", realized_pnl=18.0, fees=1.0)})
+    uc = ReconcileClosedTradesUseCase(journal, history)
+    uc.execute()
+    r = journal.result_calls[0]
+    assert r.realized_r == pytest.approx((18.0 - 1.0) / (0.0020 * 10000.0))
+
+
 def test_already_reconciled_entry_not_returned_by_open_entries():
     journal = FakeJournalPort(open_=[])
     history = FakeTradeHistoryPort({"D1": _make_closed("D1")})
     uc = ReconcileClosedTradesUseCase(journal, history)
     uc.execute()
     assert journal.result_calls == []
+
+
+def test_system_close_at_tp_level_journaled_as_tp():
+    filled_price = 1.1000
+    sl_distance = 0.0020
+    tp_distance = 0.0040
+    tp_level = filled_price + tp_distance  # 1.1040 for BUY
+
+    entry = JournalEntry(
+        deal_id="D1",
+        symbol="EURUSD",
+        direction="BUY",
+        opened_at=_NOW,
+        decision_candle_ts=_NOW,
+        filled_price=filled_price,
+        sl_distance=sl_distance,
+        tp_distance=tp_distance,
+        atr_at_entry=sl_distance / 2.0,
+        position_size=10000.0,
+        bid_at_decision=None,
+        ask_at_decision=None,
+    )
+    closed = ClosedTrade(
+        deal_id="D1",
+        closed_at=_NOW,
+        close_price=tp_level,
+        close_source="SYSTEM",
+        realized_pnl=40.0,
+        fees=1.0,
+    )
+    journal = FakeJournalPort(open_=[entry])
+    history = FakeTradeHistoryPort({"D1": closed})
+    uc = ReconcileClosedTradesUseCase(journal, history)
+    uc.execute()
+    assert len(journal.result_calls) == 1
+    assert journal.result_calls[0].close_source == "TP"
