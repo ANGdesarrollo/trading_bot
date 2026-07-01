@@ -88,34 +88,34 @@ Chain strategy: pending
 
 ### Phase 10: PairBuffer provider stamp
 
-- [ ] 3.1 **RED** `tests/unit/test_pair_buffer.py` (modify) — assert `PairBuffer(provider="capital")` stamps `row.provider == "capital"` on every emitted `CandleRow`; `PairBuffer(provider="ic_markets")` stamps `"ic_markets"`. (CS-05, AC-WCI-2, AC-WCI-3)
-- [ ] 3.2 **GREEN** Modify `src/infrastructure/capital/_pair_buffer.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `provider=self._provider` when constructing `CandleRow` in `on_event`. Make 3.1 pass.
+- [x] 3.1 **RED** `tests/unit/test_pair_buffer.py` (modify) — assert `PairBuffer(provider="capital")` stamps `row.provider == "capital"` on every emitted `CandleRow`; `PairBuffer(provider="ic_markets")` stamps `"ic_markets"`. (CS-05, AC-WCI-2, AC-WCI-3)
+- [x] 3.2 **GREEN** Modify `src/infrastructure/capital/_pair_buffer.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `provider=self._provider` when constructing `CandleRow` in `on_event`. Make 3.1 pass.
 
 ### Phase 11: CapitalCandleHistory provider stamp
 
-- [ ] 3.3 **RED** `tests/unit/test_capital_candle_history.py` (modify) — assert `CapitalCandleHistory(…, provider="capital")` returns rows where every `row.provider == "capital"`; assert `fetch_history` is called with leading `provider` arg that flows through to `_to_rows`; assert `_to_rows` receives `provider` as first positional argument (not a class field). (CS-05)
-- [ ] 3.4 **GREEN** Modify `src/infrastructure/capital/candle_history.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; thread `provider` as first arg into module-level `_to_rows(provider, raw_prices, epic, resolution)` calls inside `_cold_backfill` and `_gap_fill`; update `_to_rows` signature and `CandleRow` construction to pass `provider`. Make 3.3 pass.
+- [x] 3.3 **RED** `tests/unit/test_capital_candle_history.py` (modify) — assert `CapitalCandleHistory(…, provider="capital")` returns rows where every `row.provider == "capital"`; assert `fetch_history` is called with leading `provider` arg that flows through to `_to_rows`; assert `_to_rows` receives `provider` as first positional argument (not a class field). (CS-05)
+- [x] 3.4 **GREEN** Modify `src/infrastructure/capital/candle_history.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; thread `provider` as first arg into module-level `_to_rows(provider, raw_prices, epic, resolution)` calls inside `_cold_backfill` and `_gap_fill`; update `_to_rows` signature and `CandleRow` construction to pass `provider`. Make 3.3 pass.
 
 ### Phase 12: CapitalWsIngester provider injection
 
-- [ ] 3.5 **RED** `tests/unit/test_ws_ingester.py` (modify) — assert `CapitalWsIngester(…, provider="capital")` constructs `PairBuffer(provider="capital")`; assert `fetch_history` is called with `"capital"` as first argument; emitted rows have `row.provider == "capital"`. (CS-05)
-- [ ] 3.6 **GREEN** Modify `src/infrastructure/capital/ws_ingester.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `provider=self._provider` to `PairBuffer` constructor; pass `self._provider` as first arg to `candle_history.fetch_history(…)` calls. Make 3.5 pass.
+- [x] 3.5 **RED** `tests/unit/test_ws_ingester.py` (modify) — assert `CapitalWsIngester(…, provider="capital")` constructs `PairBuffer(provider="capital")`; assert `fetch_history` is called with `"capital"` as first argument; emitted rows have `row.provider == "capital"`. (CS-05)
+- [x] 3.6 **GREEN** Modify `src/infrastructure/capital/ws_ingester.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `provider=self._provider` to `PairBuffer` constructor; pass `self._provider` as first arg to `candle_history.fetch_history(…)` calls. Make 3.5 pass.
 
 ### Phase 13: RunTradingCycleUseCase provider injection
 
-- [ ] 3.7 **RED** `tests/unit/test_trading_cycle.py` (modify) — assert `RunTradingCycleUseCase(…, provider="capital")` calls `recent_candles("capital", symbol, resolution, count)` with provider as first arg (TC-02, TC-08); assert `_build_entry` produces `entry.provider == "capital"` (TC-07); assert omitting `provider` defaults to `"capital"`. (TC-02, TC-07, TC-08)
-- [ ] 3.8 **GREEN** Modify `src/application/trading_cycle.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `self._provider` as first arg to `candle_store.recent_candles(…)` call; stamp `provider=self._provider` in `_build_entry` when constructing `JournalEntry`. Make 3.7 pass.
+- [x] 3.7 **RED** `tests/unit/test_trading_cycle.py` (modify) — assert `RunTradingCycleUseCase(…, provider="capital")` calls `recent_candles("capital", symbol, resolution, count)` with provider as first arg (TC-02, TC-08); assert `_build_entry` produces `entry.provider == "capital"` (TC-07); assert omitting `provider` defaults to `"capital"`. (TC-02, TC-07, TC-08)
+- [x] 3.8 **GREEN** Modify `src/application/trading_cycle.py` — add `provider: str = "capital"` to `__init__`; store as `self._provider`; pass `self._provider` as first arg to `candle_store.recent_candles(…)` call; stamp `provider=self._provider` in `_build_entry` when constructing `JournalEntry`. Make 3.7 pass.
 
 ### Phase 14: Composition root wiring
 
-- [ ] 3.9 **RED** `tests/unit/test_main_wiring.py` (modify) — assert `build_use_cases` passes `provider=config.provider` to `RunTradingCycleUseCase`; no hardcoded `"capital"` string in `__main__.py`. (CS-06)
-- [ ] 3.10 **GREEN** Modify `src/__main__.py` — pass `provider=config.provider` to `RunTradingCycleUseCase` constructor. Make 3.9 pass.
-- [ ] 3.11 **RED** `tests/unit/test_ingestion.py` (modify) — assert ingestion startup passes `provider=config.provider` to both `CapitalWsIngester` and `CapitalCandleHistory`. (CS-06)
-- [ ] 3.12 **GREEN** Modify `src/ingestion.py` — pass `provider=config.provider` to `CapitalWsIngester` and `CapitalCandleHistory` at construction. Make 3.11 pass.
+- [x] 3.9 **RED** `tests/unit/test_main_wiring.py` (modify) — assert `build_use_cases` passes `provider=config.provider` to `RunTradingCycleUseCase`; no hardcoded `"capital"` string in `__main__.py`. (CS-06)
+- [x] 3.10 **GREEN** Modify `src/__main__.py` — pass `provider=config.provider` to `RunTradingCycleUseCase` constructor. Make 3.9 pass.
+- [x] 3.11 **RED** `tests/unit/test_ingestion.py` (modify) — assert ingestion startup passes `provider=config.provider` to both `CapitalWsIngester` and `CapitalCandleHistory`. (CS-06)
+- [x] 3.12 **GREEN** Modify `src/ingestion.py` — pass `provider=config.provider` to `CapitalWsIngester` and `CapitalCandleHistory` at construction. Make 3.11 pass.
 
 ### Phase 15: Final suite validation
 
-- [ ] 3.13 Full suite `uv run python -m pytest` — all tests pass; grep confirms zero hardcoded `"capital"` strings in composition roots (`src/__main__.py`, `src/ingestion.py`); grep confirms all three stamp sites (`_pair_buffer.py`, `candle_history.py`, `trading_cycle.py`) pass `provider` explicitly. (CS-05, CS-06)
+- [x] 3.13 Full suite `uv run python -m pytest` — all tests pass; grep confirms zero hardcoded `"capital"` strings in composition roots (`src/__main__.py`, `src/ingestion.py`); grep confirms all three stamp sites (`_pair_buffer.py`, `candle_history.py`, `trading_cycle.py`) pass `provider` explicitly. (CS-05, CS-06)
 
 > **Slice 3 exit gate**: `uv run python -m pytest` passes; all three provider stamp sites covered by strict-TDD tests; no hardcoded `"capital"` in composition roots; `PROVIDER` env drives the entire chain end-to-end.
 
