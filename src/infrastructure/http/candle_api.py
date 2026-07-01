@@ -40,6 +40,16 @@ def create_app(
         allow_headers=["Content-Type"],
     )
 
+    @app.get("/api/scan/datasets")
+    def get_datasets():
+        symbols = sorted(symbol_to_epic)
+        datasets = [
+            {"symbol": symbol, "timeframe": timeframe}
+            for symbol in symbols
+            for timeframe in resolution_map
+        ]
+        return {"datasets": datasets, "symbols": symbols}
+
     @app.get("/api/scan/candles")
     def get_candles(
         symbol: str,

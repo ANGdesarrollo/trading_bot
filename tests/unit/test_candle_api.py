@@ -159,3 +159,38 @@ class TestCandleApiCors:
                 headers={"Origin": "http://localhost:5173"},
             )
         assert "access-control-allow-origin" in resp.headers
+
+
+class TestDatasetsEndpoint:
+    def test_returns_200(self):
+        app, _ = _make_app()
+        with TestClient(app) as client:
+            resp = client.get("/api/scan/datasets")
+        assert resp.status_code == 200
+
+    def test_symbols_are_friendly_and_sorted(self):
+        store = FakeCandleStore(candles=[])
+        app = create_app(
+            store,
+            symbol_to_epic={"GBPUSD": "CS.D.GBPUSD.MINI.IP", "EURUSD": "CS.D.EURUSD.MINI.IP"},
+            resolution_map=_RESOLUTION_MAP,
+        )
+        with TestClient(app) as client:
+            body = client.get("/api/scan/datasets").json()
+        assert body["symbols"] == ["EURUSD", "GBPUSD"]
+
+    def test_datasets_are_symbols_times_timeframes(self):
+        app, _ = _make_app()
+        with TestClient(app) as client:
+            body = client.get("/api/scan/datasets").json()
+        assert len(body["datasets"]) == len(_RESOLUTION_MAP)
+        assert all(set(d.keys()) == {"symbol", "timeframe"} for d in body["datasets"])
+        assert all(d["symbol"] == "EURUSD" for d in body["datasets"])
+
+    def test_empty_symbol_map_returns_empty(self):
+        store = FakeCandleStore(candles=[])
+        app = create_app(store, symbol_to_epic={}, resolution_map=_RESOLUTION_MAP)
+        with TestClient(app) as client:
+            body = client.get("/api/scan/datasets").json()
+        assert body["symbols"] == []
+        assert body["datasets"] == []
