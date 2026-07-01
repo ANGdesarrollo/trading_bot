@@ -11,9 +11,11 @@ class CandleHistoryPort(ABC):
     @abstractmethod
     def fetch_history(
         self,
+        provider: str = "capital",
+        *,
         epic: str,
         resolution: str,
         count: int,
         since: datetime | None,
     ) -> Sequence[CandleRow]:
-        """Fetch up to `count` closed candles. If `since` is given, fetch from that point forward."""
+        """Fetch up to `count` closed candles for `provider`. If `since` is given, fetch from that point forward."""
