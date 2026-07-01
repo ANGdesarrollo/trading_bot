@@ -130,11 +130,17 @@ class FakeStore(CandleStorePort):
     def __init__(self, last_start: datetime | None = None) -> None:
         self._last_start = last_start
         self.upserted: list[CandleRow] = []
+        self.last_candle_start_calls: list[tuple[str, str, str]] = []
 
-    def recent_candles(self, symbol: str, resolution: str, count: int) -> Sequence[Candle]:
+    def recent_candles(
+        self, *, provider: str = "capital", symbol: str, resolution: str, count: int
+    ) -> Sequence[Candle]:
         return []
 
-    def last_candle_start(self, symbol: str, resolution: str) -> datetime | None:
+    def last_candle_start(
+        self, *, provider: str = "capital", symbol: str, resolution: str
+    ) -> datetime | None:
+        self.last_candle_start_calls.append((provider, symbol, resolution))
         return self._last_start
 
     def upsert_candle(self, row: CandleRow) -> None:
@@ -144,12 +150,12 @@ class FakeStore(CandleStorePort):
 class FakeHistory(CandleHistoryPort):
     def __init__(self, rows: list[CandleRow] | None = None) -> None:
         self._rows = rows or []
-        self.calls: list[tuple[str, str, int, datetime | None]] = []
+        self.calls: list[tuple[str, str, str, int, datetime | None]] = []
 
     def fetch_history(
-        self, epic: str, resolution: str, count: int, since: datetime | None
+        self, *, provider: str = "capital", epic: str, resolution: str, count: int, since: datetime | None
     ) -> Sequence[CandleRow]:
-        self.calls.append((epic, resolution, count, since))
+        self.calls.append((provider, epic, resolution, count, since))
         return self._rows
 
 
@@ -219,7 +225,8 @@ def test_cold_start_fetches_backfill_then_upserts():
     ingester.run_once()
 
     assert len(history.calls) == 1
-    epic, resolution, count, since = history.calls[0]
+    provider, epic, resolution, count, since = history.calls[0]
+    assert provider == "capital"
     assert epic == _EPIC
     assert since is None
     assert count >= 3
@@ -236,7 +243,7 @@ def test_warm_start_fetches_gap_only():
     ingester.run_once()
 
     assert len(history.calls) == 1
-    _, _, count, since = history.calls[0]
+    _, _, _, count, since = history.calls[0]
     assert since == t_last + timedelta(seconds=_PERIOD_S)
 
 

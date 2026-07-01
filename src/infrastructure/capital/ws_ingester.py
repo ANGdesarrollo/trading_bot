@@ -110,14 +110,14 @@ class CapitalWsIngester:
             last = self._store.last_candle_start(symbol=epic, resolution=self._resolution)
             if last is None:
                 rows = self._history.fetch_history(
-                    epic, self._resolution, self._required_candles, None
+                    epic=epic, resolution=self._resolution, count=self._required_candles, since=None
                 )
             else:
                 period_s = self._period_seconds.get((epic, self._resolution), 60)
                 from datetime import timedelta
                 since = last + timedelta(seconds=period_s)
                 rows = self._history.fetch_history(
-                    epic, self._resolution, self._required_candles, since
+                    epic=epic, resolution=self._resolution, count=self._required_candles, since=since
                 )
             for row in rows:
                 self._store.upsert_candle(row)
