@@ -29,14 +29,15 @@ def create_app(
     symbol_to_epic: dict[str, str],
     resolution_map: dict[str, str],
     allow_origins: list[str] | None = None,
+    lifespan=None,
 ) -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins if allow_origins is not None else _DEFAULT_ORIGINS,
         allow_methods=["GET"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type"],
     )
 
     @app.get("/api/scan/candles")

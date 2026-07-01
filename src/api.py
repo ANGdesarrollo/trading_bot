@@ -7,43 +7,49 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
+_RESOLUTION_MAP = {
+    "1m": "MINUTE",
+    "5m": "MINUTE_5",
+    "15m": "MINUTE_15",
+    "30m": "MINUTE_30",
+    "1h": "HOUR",
+    "4h": "HOUR_4",
+    "1d": "DAY",
+    "1w": "WEEK",
+}
+
 
 def run(host: str, port: int, cors_origins: list[str]) -> None:
-    import uvicorn
+    import contextlib
 
-    from config import load_config
+    import uvicorn
+    from fastapi import FastAPI
+
+    from config import load_api_config
     from infrastructure.http.candle_api import create_app
     from infrastructure.postgres.candle_store import PostgresCandleStore
     from infrastructure.postgres.connection import connect
     from infrastructure.postgres.migration_runner import run_migrations
 
-    config = load_config()
+    config = load_api_config()
     conn = connect(config.database_url)
     run_migrations(conn)
 
     store = PostgresCandleStore(conn)
     symbol_to_epic = {s.symbol: s.epic for s in config.symbols}
-    resolution_map = {
-        "1m": "MINUTE",
-        "5m": "MINUTE_5",
-        "15m": "MINUTE_15",
-        "30m": "MINUTE_30",
-        "1h": "HOUR",
-        "4h": "HOUR_4",
-        "1d": "DAY",
-        "1w": "WEEK",
-    }
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        yield
+        conn.close()
 
     app = create_app(
         store,
         symbol_to_epic=symbol_to_epic,
-        resolution_map=resolution_map,
+        resolution_map=_RESOLUTION_MAP,
         allow_origins=cors_origins,
+        lifespan=lifespan,
     )
-
-    @app.on_event("shutdown")
-    def _close_conn() -> None:
-        conn.close()
 
     uvicorn.run(app, host=host, port=port)
 
