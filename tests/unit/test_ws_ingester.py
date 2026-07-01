@@ -241,7 +241,7 @@ def test_cold_start_fetches_backfill_then_upserts():
 
 
 def test_warm_start_fetches_gap_only():
-    t_last = _T_DT
+    t_last = datetime(2023, 11, 14, 21, 0, 0, tzinfo=timezone.utc)
     history = FakeHistory([_row(_T_DT + timedelta(seconds=60))])
     store = FakeStore(last_start=t_last)
     transport = FakeWsTransport([_subscribe_ack()])
@@ -252,6 +252,20 @@ def test_warm_start_fetches_gap_only():
     assert len(history.calls) == 1
     _, _, _, count, since = history.calls[0]
     assert since == t_last + timedelta(seconds=_PERIOD_S)
+
+
+def test_warm_start_skips_gap_fill_when_gap_below_one_period():
+    # Clock is fixed at 22:00:00; last candle is 21:59:30 so the next
+    # expected candle has not closed yet -> no gap-fill REST call.
+    t_last = datetime(2023, 11, 14, 21, 59, 30, tzinfo=timezone.utc)
+    history = FakeHistory([_row(_T_DT)])
+    store = FakeStore(last_start=t_last)
+    transport = FakeWsTransport([_subscribe_ack()])
+
+    ingester = _make_ingester(transport, store, history)
+    ingester.run_once()
+
+    assert history.calls == []
 
 
 def test_bid_only_event_does_not_upsert():
@@ -390,7 +404,7 @@ def test_session_reauthenticated_on_refresh_tick():
 
 
 def test_reconnect_on_drop_calls_gap_fill_again():
-    t_last = _T_DT
+    t_last = datetime(2023, 11, 14, 21, 0, 0, tzinfo=timezone.utc)
     history = FakeHistory([_row(_T_DT + timedelta(seconds=60))])
     store = FakeStore(last_start=t_last)
 

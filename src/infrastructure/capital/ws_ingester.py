@@ -68,12 +68,14 @@ class CapitalWsIngester:
                 self._clock.sleep(_RECONNECT_DELAY_S)
 
     def _connect_and_process(self) -> None:
-        self._session.authenticate()
         url = f"{self._session.streaming_host}/connect"
         self._transport.connect(url)
         connected_at = self._clock.utcnow()
         self._subscribe()
-        self._backfill_or_gap_fill()
+        try:
+            self._backfill_or_gap_fill()
+        except Exception:
+            _log.warning("gap-fill on reconnect failed; continuing on stream", exc_info=True)
         self._process_events(connected_at)
 
     def _subscribe(self) -> None:
@@ -105,6 +107,8 @@ class CapitalWsIngester:
                 period_s = self._period_seconds.get((epic, self._resolution), 60)
                 from datetime import timedelta
                 since = last + timedelta(seconds=period_s)
+                if (self._clock.utcnow() - since).total_seconds() < period_s:
+                    continue
                 rows = self._history.fetch_history(
                     provider=self._provider, epic=epic,
                     resolution=self._resolution, count=self._required_candles, since=since
