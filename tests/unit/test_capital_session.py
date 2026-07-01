@@ -117,6 +117,19 @@ def test_streaming_host_available_after_authenticate():
     assert session.streaming_host == "wss://api-streaming-capital.backend-capital.com"
 
 
+def test_streaming_host_strips_trailing_slash():
+    response = CannedResponse(
+        status_code=200,
+        headers={"CST": "cst-value-123", "X-SECURITY-TOKEN": "xst-value-456"},
+        json_body={"streamingHost": "wss://api-streaming-capital.backend-capital.com/"},
+    )
+    session, _ = _make_session([response])
+
+    session.authenticate()
+
+    assert session.streaming_host == "wss://api-streaming-capital.backend-capital.com"
+
+
 def test_authenticate_still_returns_session_tokens_with_streaming_host():
     response = CannedResponse(
         status_code=200,

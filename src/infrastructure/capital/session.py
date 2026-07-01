@@ -52,7 +52,8 @@ class CapitalSession:
         security_token = response.headers.get("X-SECURITY-TOKEN", "")
         self._tokens = SessionTokens(cst=cst, security_token=security_token)
         body = response.json()
-        self._streaming_host = body.get("streamingHost")
+        streaming_host = body.get("streamingHost")
+        self._streaming_host = streaming_host.rstrip("/") if streaming_host else streaming_host
         return self._tokens
 
     def tokens(self) -> SessionTokens:
