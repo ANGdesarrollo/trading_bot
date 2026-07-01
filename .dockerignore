@@ -1,0 +1,15 @@
+.venv/
+.git/
+.gitignore
+.env
+.env.*
+tests/
+openspec/
+.atl/
+.pytest_cache/
+**/__pycache__/
+*.pyc
+Makefile
+Dockerfile
+.dockerignore
+docker-compose.yml

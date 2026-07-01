@@ -1,7 +1,7 @@
-.PHONY: up down logs operator reconciler
+.PHONY: up down logs ps build operator-local reconciler-local
 
 up:
-	docker compose up -d
+	docker compose up -d --build
 
 down:
 	docker compose down
@@ -9,8 +9,14 @@ down:
 logs:
 	docker compose logs -f
 
-operator:
+ps:
+	docker compose ps
+
+build:
+	docker compose build
+
+operator-local:
 	PYTHONPATH=src .venv/bin/python3 src/__main__.py
 
-reconciler:
+reconciler-local:
 	PYTHONPATH=src .venv/bin/python3 src/reconciler.py

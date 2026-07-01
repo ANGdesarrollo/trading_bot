@@ -6,9 +6,36 @@ services:
       POSTGRES_USER: operator
       POSTGRES_PASSWORD: operator_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U operator -d trade_journal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  operator:
+    build: .
+    command: ["python", "src/__main__.py"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reconciler:
+    build: .
+    command: ["python", "src/reconciler.py"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata: {}
