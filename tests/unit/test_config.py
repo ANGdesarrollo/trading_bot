@@ -111,9 +111,9 @@ def test_reconciler_interval_env_override():
     assert config.reconciler_interval_seconds == 120
 
 
-def test_session_refresh_ttl_defaults_to_540():
+def test_session_refresh_ttl_defaults_to_300():
     config = _load_config(_REQUIRED_ENV)
-    assert config.session_refresh_ttl_seconds == 540.0
+    assert config.session_refresh_ttl_seconds == 300.0
 
 
 def test_session_refresh_ttl_env_override():

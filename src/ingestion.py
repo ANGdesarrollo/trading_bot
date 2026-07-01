@@ -24,7 +24,6 @@ if __name__ == "__main__":
     from config import load_config
     from infrastructure.capital.candle_history import CapitalCandleHistory
     from infrastructure.capital.clock import SystemClock
-    from infrastructure.capital.session import CapitalSession
     from infrastructure.capital.shared_cached_session import SharedCachedSession
     from infrastructure.capital.ws_ingester import CapitalWsIngester
     from infrastructure.capital.ws_transport import WebsocketClientTransport
@@ -45,20 +44,9 @@ if __name__ == "__main__":
 
     _http = requests.Session()
     _clock = SystemClock()
-    _capital_session = CapitalSession(
-        http=_http,
-        base_url=_config.base_url,
-        api_key=_config.api_key,
-        identifier=_config.identifier,
-        password=_config.password,
-        clock=_clock,
-        max_auth_retries=_config.auth_max_retries,
-    )
     _session = SharedCachedSession(
-        inner=_capital_session,
         cache=PostgresSessionCache(_conn),
         clock=_clock,
-        owner=True,
     )
     _session.authenticate()
 

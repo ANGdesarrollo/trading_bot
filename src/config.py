@@ -109,7 +109,7 @@ def load_config() -> Config:
     candle_settle_seconds = int(env.get("CANDLE_SETTLE_SECONDS", "5"))
     poll_minutes = int(env.get("POLL_MINUTES", "15"))
     reconciler_interval_seconds = int(env.get("RECONCILER_INTERVAL_SECONDS", "300"))
-    session_refresh_ttl_seconds = float(env.get("SESSION_REFRESH_TTL_SECONDS", "540"))
+    session_refresh_ttl_seconds = float(env.get("SESSION_REFRESH_TTL_SECONDS", "300"))
     ws_ping_interval_seconds = int(env.get("WS_PING_INTERVAL_SECONDS", "45"))
     backfill_max_candles = int(env.get("BACKFILL_MAX_CANDLES", "500"))
     auth_max_retries = int(env.get("AUTH_MAX_RETRIES", "5"))

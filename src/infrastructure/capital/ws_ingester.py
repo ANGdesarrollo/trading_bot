@@ -13,7 +13,6 @@ from infrastructure.capital.ws_transport import RecvTimeout
 _log = logging.getLogger(__name__)
 
 _RECONNECT_DELAY_S = 0.5
-_TOKEN_REFRESH_S = 540.0
 
 _OHLC_EVENT = "ohlc.event"
 
@@ -68,6 +67,7 @@ class CapitalWsIngester:
                 self._clock.sleep(_RECONNECT_DELAY_S)
 
     def _connect_and_process(self) -> None:
+        self._session.authenticate()
         url = f"{self._session.streaming_host}/connect"
         self._transport.connect(url)
         connected_at = self._clock.utcnow()
@@ -136,16 +136,12 @@ class CapitalWsIngester:
         )
         if last_ping is None:
             last_ping = self._clock.utcnow()
-        last_auth = self._clock.utcnow()
 
         while True:
             now = self._clock.utcnow()
             if (now - last_ping).total_seconds() >= self._ping_interval:
                 self._send_ping()
                 last_ping = now
-            if (now - last_auth).total_seconds() >= _TOKEN_REFRESH_S:
-                self._session.authenticate()
-                last_auth = now
 
             try:
                 raw = self._transport.recv()

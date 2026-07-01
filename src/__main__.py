@@ -20,7 +20,6 @@ from domain.adapters.fade_strategy import FadeStrategy
 from domain.ports.trade_journal_port import TradeJournalPort
 from infrastructure.capital.broker import CapitalBrokerAdapter
 from infrastructure.capital.clock import SystemClock
-from infrastructure.capital.session import CapitalSession
 from infrastructure.capital.shared_cached_session import SharedCachedSession
 from infrastructure.postgres.candle_store import PostgresCandleStore
 from infrastructure.postgres.connection import connect
@@ -71,20 +70,9 @@ def build_use_cases(
         if session_cache is None:
             session_cache = PostgresSessionCache(conn)
 
-    capital_session = CapitalSession(
-        http=http,
-        base_url=config.base_url,
-        api_key=config.api_key,
-        identifier=config.identifier,
-        password=config.password,
-        clock=clock,
-        max_auth_retries=config.auth_max_retries,
-    )
     session = SharedCachedSession(
-        inner=capital_session,
         cache=session_cache,
         clock=clock,
-        owner=False,
     )
     broker = CapitalBrokerAdapter(
         session=session,

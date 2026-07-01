@@ -15,9 +15,9 @@ services:
       timeout: 3s
       retries: 10
 
-  ingestion:
+  token-refresher:
     build: .
-    command: ["python", "src/ingestion.py"]
+    command: ["python", "src/token_refresher.py"]
     restart: unless-stopped
     env_file: .env
     environment:
@@ -31,6 +31,19 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+
+  ingestion:
+    build: .
+    command: ["python", "src/ingestion.py"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      token-refresher:
+        condition: service_healthy
 
   api:
     build: .
@@ -58,7 +71,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ingestion:
+      token-refresher:
         condition: service_healthy
 
   reconciler:
@@ -71,7 +84,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ingestion:
+      token-refresher:
         condition: service_healthy
 
 volumes:
