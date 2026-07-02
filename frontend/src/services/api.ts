@@ -1,4 +1,4 @@
-import type { DatasetsResponse, CandlesResponse, CandlesParams } from '../types/api';
+import type { DatasetsResponse, CandlesResponse, CandlesParams, TradesResponse, TradesParams } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
@@ -39,6 +39,13 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', String(params.limit));
     if (params.provider)            query.set('provider', params.provider);
     return fetchJson<CandlesResponse>(`${API_BASE_URL}/api/scan/candles?${query}`);
+  },
+
+  async getTrades(params: TradesParams): Promise<TradesResponse> {
+    const query = new URLSearchParams({ symbol: params.symbol, timeframe: params.timeframe });
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.provider)            query.set('provider', params.provider);
+    return fetchJson<TradesResponse>(`${API_BASE_URL}/api/scan/trades?${query}`);
   },
 };
 

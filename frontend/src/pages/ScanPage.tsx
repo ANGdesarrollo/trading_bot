@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChartViewport } from '../components/organisms/ChartViewport';
 import { Button } from '../components/atoms/Button';
 import { api, ApiError } from '../services/api';
-import type { CandlesResponse, DatasetInfo } from '../types/api';
+import type { CandlesResponse, DatasetInfo, TradesResponse } from '../types/api';
 
 const DEFAULT_LIMIT = 500;
 
@@ -14,6 +14,7 @@ export default function ScanPage() {
   const [selectedTimeframe, setSelectedTimeframe] = useState('15m');
 
   const [candlesData, setCandlesData] = useState<CandlesResponse | null>(null);
+  const [tradesData, setTradesData] = useState<TradesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,16 +43,20 @@ export default function ScanPage() {
   const loadCandles = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const params = { symbol: selectedSymbol, timeframe: selectedTimeframe, limit: DEFAULT_LIMIT };
     try {
-      const res = await api.getCandles({
-        symbol: selectedSymbol,
-        timeframe: selectedTimeframe,
-        limit: DEFAULT_LIMIT,
-      });
-      setCandlesData(res);
+      const [candlesResult, tradesResult] = await Promise.allSettled([
+        api.getCandles(params),
+        api.getTrades(params),
+      ]);
+      if (candlesResult.status === 'rejected') throw candlesResult.reason;
+      setCandlesData(candlesResult.value);
+      // Trades are an overlay — a failed trades fetch must not blank the chart.
+      setTradesData(tradesResult.status === 'fulfilled' ? tradesResult.value : null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unknown error occurred');
       setCandlesData(null);
+      setTradesData(null);
     } finally {
       setLoading(false);
     }
@@ -113,6 +118,7 @@ export default function ScanPage() {
         {displayCandles.length > 0 ? (
           <ChartViewport
             candles={displayCandles}
+            trades={tradesData?.trades ?? []}
             symbol={selectedSymbol}
             timeframe={selectedTimeframe}
           />

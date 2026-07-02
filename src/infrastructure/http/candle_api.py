@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import FastAPI, HTTPException, Query
 from starlette.middleware.cors import CORSMiddleware
 
+from application.fade_trades import build_fade_trades_response
 from domain.entities.candle import Candle
 from domain.ports.candle_store_port import CandleStorePort
 
@@ -50,13 +51,7 @@ def create_app(
         ]
         return {"datasets": datasets, "symbols": symbols}
 
-    @app.get("/api/scan/candles")
-    def get_candles(
-        symbol: str,
-        timeframe: str,
-        provider: str = "capital",
-        limit: Annotated[int, Query(gt=0)] = 500,
-    ):
+    def _load_candles(symbol: str, timeframe: str, provider: str, limit: int):
         epic = symbol_to_epic.get(symbol)
         if epic is None:
             raise HTTPException(status_code=404, detail=f"Unknown symbol: {symbol}")
@@ -65,13 +60,32 @@ def create_app(
         if resolution is None:
             raise HTTPException(status_code=400, detail=f"Unknown timeframe: {timeframe}")
 
-        candles = store.recent_candles(
+        return store.recent_candles(
             provider=provider, symbol=epic, resolution=resolution, count=limit
         )
+
+    @app.get("/api/scan/candles")
+    def get_candles(
+        symbol: str,
+        timeframe: str,
+        provider: str = "capital",
+        limit: Annotated[int, Query(gt=0)] = 500,
+    ):
+        candles = _load_candles(symbol, timeframe, provider, limit)
         bars = [candle_to_dict(c) for c in candles]
         return {
             "meta": {"symbol": symbol, "timeframe": timeframe, "bars": len(bars)},
             "candles": bars,
         }
+
+    @app.get("/api/scan/trades")
+    def get_trades(
+        symbol: str,
+        timeframe: str,
+        provider: str = "capital",
+        limit: Annotated[int, Query(gt=0)] = 500,
+    ):
+        candles = _load_candles(symbol, timeframe, provider, limit)
+        return build_fade_trades_response(list(candles), symbol=symbol, timeframe=timeframe)
 
     return app

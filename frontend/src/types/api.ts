@@ -71,3 +71,25 @@ export interface CandlesParams {
   limit?: number;
   provider?: string;
 }
+
+export interface TradesMeta {
+  symbol: string;
+  timeframe: string;
+  trades: number;
+  win_rate: number;
+  total_r: number;
+  expectancy_r: number;
+  cost_pct: number;
+}
+
+export interface TradesResponse {
+  meta: TradesMeta;
+  trades: FadeTrade[];
+}
+
+export interface TradesParams {
+  symbol: string;
+  timeframe: string;
+  limit?: number;
+  provider?: string;
+}
