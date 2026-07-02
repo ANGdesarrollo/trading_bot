@@ -1,27 +1,66 @@
 from __future__ import annotations
 
 import logging
+from datetime import timezone
+
+from domain.boundary import seconds_until_next_boundary
 
 _log = logging.getLogger("ingestion_polygon")
 
+_SETTLE_SECONDS = 3.0
+_RETRY_INTERVAL_S = 1.0
+_MAX_RETRIES = 30
+
+
+def _expected_candle_start(now, period_minutes):
+    period = period_minutes * 60
+    boundary = now.timestamp() - (now.timestamp() % period)
+    from datetime import datetime
+    return datetime.fromtimestamp(boundary - period, tz=timezone.utc)
+
 
 def run_polygon_ingestion_forever(history, store, clock, symbols, resolution,
-                                  required_candles, poll_seconds, provider="polygon"):
+                                  period_minutes, required_candles, provider="polygon"):
+    """Poll aligned to the 15-min boundary: after each close, fetch the just-closed
+    candle for every symbol, retrying every second until it appears (Polygon
+    publishes a few seconds after close)."""
     while True:
+        wait = seconds_until_next_boundary(clock.utcnow(), period_minutes)
+        clock.sleep(wait + _SETTLE_SECONDS)
+        expected = _expected_candle_start(clock.utcnow(), period_minutes)
         for symbol in symbols:
-            try:
-                rows = history.fetch_history(
-                    provider=provider, epic=symbol, resolution=resolution,
-                    count=required_candles, since=None)
-                for row in rows:
-                    store.upsert_candle(row)
-                if rows:
-                    _log.info(
-                        "persisting candle epic=%s start=%s",
-                        symbol, rows[0].candle_start)
-            except Exception:
-                _log.exception("polygon fetch failed for %s; continuing", symbol)
-        clock.sleep(poll_seconds)
+            _ingest_symbol(history, store, clock, symbol, resolution,
+                           required_candles, expected, provider)
+
+
+def _ingest_symbol(history, store, clock, symbol, resolution, required_candles,
+                   expected, provider):
+    for attempt in range(_MAX_RETRIES):
+        try:
+            rows = history.fetch_history(
+                provider=provider, epic=symbol, resolution=resolution,
+                count=required_candles, since=None)
+        except Exception:
+            _log.exception("polygon fetch failed for %s; retrying", symbol)
+            rows = []
+
+        # Polygon returns the still-forming (current) bar as the newest result,
+        # so never trust rows[0]; only persist bars that have actually closed
+        # (candle_start <= expected), and confirm the just-closed one is present.
+        closed = [r for r in rows if r.candle_start <= expected]
+        if any(r.candle_start == expected for r in closed):
+            for row in closed:
+                store.upsert_candle(row)
+            _log.info("persisting candle epic=%s start=%s", symbol, expected)
+            return
+
+        _log.info(
+            "[%s] candle %s not published yet (attempt %d/%d); waiting %.0fs",
+            symbol, expected, attempt + 1, _MAX_RETRIES, _RETRY_INTERVAL_S)
+        clock.sleep(_RETRY_INTERVAL_S)
+
+    _log.warning("[%s] candle %s never appeared after %d attempts; skipping",
+                 symbol, expected, _MAX_RETRIES)
 
 
 if __name__ == "__main__":
@@ -59,7 +98,7 @@ if __name__ == "__main__":
         clock=SystemClock(),
         symbols=[s.epic for s in _config.symbols],
         resolution=_config.timeframe,
+        period_minutes=_config.poll_minutes,
         required_candles=_config.required_candles,
-        poll_seconds=_config.polygon_poll_seconds,
         provider="polygon",
     )

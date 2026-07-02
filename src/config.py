@@ -60,7 +60,6 @@ class Config:
     provider: str = "capital"
     polygon_api_key: str = ""
     polygon_base_url: str = "https://api.massive.com"
-    polygon_poll_seconds: int = 60
 
     @property
     def epics(self) -> dict[str, str]:
@@ -121,7 +120,6 @@ def load_config() -> Config:
         raise ValueError("PROVIDER must not be empty when set")
     polygon_api_key = env.get("POLYGON_API_KEY", "")
     polygon_base_url = env.get("POLYGON_BASE_URL", "https://api.massive.com")
-    polygon_poll_seconds = int(env.get("POLYGON_POLL_SECONDS", "60"))
 
     if ws_ping_interval_seconds >= _WS_PING_MAX_SECONDS:
         raise ValueError(
@@ -163,7 +161,6 @@ def load_config() -> Config:
         provider=provider,
         polygon_api_key=polygon_api_key,
         polygon_base_url=polygon_base_url,
-        polygon_poll_seconds=polygon_poll_seconds,
     )
 
 
