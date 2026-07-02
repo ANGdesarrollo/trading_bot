@@ -39,6 +39,9 @@ reconciler-local: ## Run the reconciler locally (no docker)
 api-local: ## Run the candle HTTP API locally on port 8001 (no docker)
 	PYTHONPATH=src .venv/bin/python3 src/api.py
 
+ingestion-polygon-local: ## Run the Polygon candle ingestion locally (no docker)
+	PYTHONPATH=src .venv/bin/python3 src/ingestion_polygon.py
+
 frontend: ## Run the candle viewer dev server on port 5173
 	cd frontend && pnpm dev
 

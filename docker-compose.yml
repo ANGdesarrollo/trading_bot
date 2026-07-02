@@ -32,9 +32,9 @@ services:
       retries: 12
       start_period: 60s
 
-  ingestion:
+  polygon-ingestion:
     build: .
-    command: ["python", "src/ingestion.py"]
+    command: ["python", "src/ingestion_polygon.py"]
     restart: unless-stopped
     env_file: .env
     environment:
@@ -42,8 +42,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      token-refresher:
-        condition: service_healthy
+
+  # Capital WS candle ingestion — kept as a fallback, disabled while Polygon is
+  # the active candle source. Re-enable and set PROVIDER=capital to switch back.
+  # ingestion:
+  #   build: .
+  #   command: ["python", "src/ingestion.py"]
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   environment:
+  #     DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     token-refresher:
+  #       condition: service_healthy
 
   api:
     build: .
@@ -68,11 +81,14 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+      PROVIDER: polygon
     depends_on:
       postgres:
         condition: service_healthy
       token-refresher:
         condition: service_healthy
+      polygon-ingestion:
+        condition: service_started
 
   reconciler:
     build: .
@@ -81,6 +97,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://operator:operator_dev@postgres:5432/trade_journal
+      PROVIDER: polygon
     depends_on:
       postgres:
         condition: service_healthy
