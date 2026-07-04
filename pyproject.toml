@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Hexagonal trading engine running validated strategies against pluggable broker providers"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "requests",
+    "requests[socks]",
     "python-dotenv",
     "numpy>=1.26.0",
     "pandas>=2.2.0",

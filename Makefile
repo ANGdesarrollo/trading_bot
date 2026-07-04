@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps build operator-local reconciler-local api-local frontend test postgres api frontend-detached
+.PHONY: help up down logs ps build operator-local reconciler-local api-local frontend test postgres api frontend-detached rebalance rebalance-execute
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -47,3 +47,16 @@ frontend: ## Run the candle viewer dev server on port 5173
 
 test: ## Run the test suite
 	uv run python -m pytest
+
+# eToro tarpits authenticated requests from the home IP; traffic must egress
+# through the vida server (see ETORO_TUNNEL). Keys must whitelist that IP.
+ETORO_TUNNEL = nc -z 127.0.0.1 1080 2>/dev/null || ssh -D 1080 -N -f vida
+ETORO_PROXY = HTTPS_PROXY=socks5h://127.0.0.1:1080
+
+rebalance: ## Preview eToro portfolio rebalance orders (dry-run, no orders placed)
+	@$(ETORO_TUNNEL)
+	$(ETORO_PROXY) uv run python scripts/rebalance_etoro.py
+
+rebalance-execute: ## Rebalance the eToro portfolio for real (places orders)
+	@$(ETORO_TUNNEL)
+	$(ETORO_PROXY) uv run python scripts/rebalance_etoro.py --execute
