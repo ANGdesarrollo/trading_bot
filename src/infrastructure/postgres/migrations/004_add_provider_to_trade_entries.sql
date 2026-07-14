@@ -1,1 +1,0 @@
-ALTER TABLE trade_entries ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'capital';
