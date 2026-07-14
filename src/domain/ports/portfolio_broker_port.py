@@ -17,5 +17,5 @@ class PortfolioBrokerPort(ABC):
         """Open or increase a position by amount_usd. Returns order/position id."""
 
     @abstractmethod
-    def sell(self, symbol: str, amount_usd: float) -> str:
-        """Close or reduce a position by amount_usd. Returns order/position id."""
+    def sell(self, symbol: str, amount_usd: float) -> list[str]:
+        """Close or reduce a position by amount_usd. Returns close order IDs."""

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from domain.ports.portfolio_broker_port import PortfolioBrokerPort
 from infrastructure.etoro.client import EToroClient
 
 _log = logging.getLogger(__name__)
+
+_DUST_THRESHOLD_USD = 0.01
+
+
+def _position_open_time(position: dict) -> datetime:
+    parsed = datetime.fromisoformat(position["openDateTime"].replace("Z", "+00:00"))
+    # eToro timestamps are UTC; suffix-less strings parse naive and must not mix with aware
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
@@ -15,8 +24,8 @@ class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
     prefer real ETFs over CFDs for the gold leg. The symbol_to_etoro_ticker
     dict is the single source of truth for this mapping.
 
-    Instrument ID resolution is done once at first use and cached in-process.
-    Sells convert USD delta to units via the position's current amount/units ratio.
+    Copy-trading positions (mirrorID != 0) are never counted or touched.
+    eToro treats omitted UnitsToDeduct as a full position close.
     """
 
     def __init__(
@@ -28,7 +37,7 @@ class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
         self._symbol_to_etoro_ticker = symbol_to_etoro_ticker
         self._etoro_ticker_to_instrument_id: dict[str, int] = {}
         self._instrument_id_to_domain_symbol: dict[int, str] = {}
-        self._instrument_id_to_position: dict[int, dict] = {}
+        self._instrument_id_to_positions: dict[int, list[dict]] = {}
         self._resolved = False
 
     def _resolve_instrument_map(self) -> None:
@@ -48,7 +57,12 @@ class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
     def _refresh_portfolio(self) -> dict:
         portfolio = self._client.get_portfolio()
         positions = portfolio["clientPortfolio"].get("positions", [])
-        self._instrument_id_to_position = {p["instrumentID"]: p for p in positions}
+        grouped: dict[int, list[dict]] = {}
+        for p in positions:
+            if p.get("mirrorID", 0) != 0:
+                continue
+            grouped.setdefault(p["instrumentID"], []).append(p)
+        self._instrument_id_to_positions = grouped
         return portfolio["clientPortfolio"]
 
     def available_cash(self) -> float:
@@ -67,12 +81,13 @@ class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
             self._resolve_instrument_map()
         self._refresh_portfolio()
         result: dict[str, float] = {}
-        for instrument_id, position in self._instrument_id_to_position.items():
+        for instrument_id, pos_list in self._instrument_id_to_positions.items():
             domain_symbol = self._instrument_id_to_domain_symbol.get(instrument_id)
             if domain_symbol is not None:
-                result[domain_symbol] = float(
-                    position["unrealizedPnL"]["exposureInAccountCurrency"]
+                total_exposure = sum(
+                    float(p["unrealizedPnL"]["exposureInAccountCurrency"]) for p in pos_list
                 )
+                result[domain_symbol] = total_exposure
         return result
 
     def buy(self, symbol: str, amount_usd: float) -> str:
@@ -90,41 +105,57 @@ class EToroPortfolioBrokerAdapter(PortfolioBrokerPort):
         _log.info("BUY %s %.2f -> orderId=%s", symbol, amount_usd, order_id)
         return order_id
 
-    def sell(self, symbol: str, amount_usd: float) -> str:
-        """Close a portion of an existing position by converting USD to units.
-
-        eToro's close endpoint requires units, not USD amounts. We derive units
-        proportionally from the position's current amount and unit count.
-        """
+    def sell(self, symbol: str, amount_usd: float) -> list[str]:
         if not self._resolved:
             self._resolve_instrument_map()
         etoro_ticker = self._symbol_to_etoro_ticker[symbol]
         instrument_id = self._etoro_ticker_to_instrument_id[etoro_ticker]
 
-        if not self._instrument_id_to_position:
-            self._refresh_portfolio()
+        self._refresh_portfolio()
 
-        position = self._instrument_id_to_position.get(instrument_id)
-        if position is None:
+        pos_list = self._instrument_id_to_positions.get(instrument_id)
+        if not pos_list:
             raise ValueError(f"no open position found for {symbol} (eToro: {etoro_ticker})")
 
-        current_value_usd = float(position["unrealizedPnL"]["exposureInAccountCurrency"])
-        position_units = float(position["units"])
+        fifo_positions = sorted(pos_list, key=_position_open_time)
 
-        if current_value_usd <= 0:
-            raise ValueError(f"position for {symbol} has zero exposure; cannot compute unit ratio")
+        remaining = amount_usd
+        order_ids: list[str] = []
 
-        fraction = min(amount_usd / current_value_usd, 1.0)
-        units_to_close = position_units * fraction
+        for position in fifo_positions:
+            exposure = float(position["unrealizedPnL"]["exposureInAccountCurrency"])
+            if remaining < _DUST_THRESHOLD_USD or exposure <= 0:
+                continue
 
-        response = self._client.close_position(
-            position_id=int(position["positionID"]),
-            instrument_id=instrument_id,
-            units_to_deduct=units_to_close,
-        )
-        order_id = str(response.get("orderForClose", {}).get("orderID", ""))
-        _log.info(
-            "SELL %s %.2f (units=%.4f) -> orderID=%s",
-            symbol, amount_usd, units_to_close, order_id,
-        )
-        return order_id
+            position_id = int(position["positionID"])
+            units = float(position["units"])
+
+            if remaining >= exposure:
+                response = self._client.close_position(
+                    position_id=position_id,
+                    instrument_id=instrument_id,
+                    units_to_deduct=None,
+                )
+                remaining -= exposure
+            else:
+                response = self._client.close_position(
+                    position_id=position_id,
+                    instrument_id=instrument_id,
+                    units_to_deduct=units * (remaining / exposure),
+                )
+                remaining = 0.0
+
+            order_id = str(response.get("orderForClose", {}).get("orderID", ""))
+            order_ids.append(order_id)
+            _log.info("SELL %s position=%s -> orderID=%s", symbol, position_id, order_id)
+
+        if not order_ids:
+            raise ValueError(f"no closeable positions found for {symbol} (eToro: {etoro_ticker})")
+
+        if remaining >= _DUST_THRESHOLD_USD:
+            _log.warning(
+                "SELL %s shortfall: requested %.2f but only %.2f available across positions",
+                symbol, amount_usd, amount_usd - remaining,
+            )
+
+        return order_ids
