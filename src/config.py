@@ -36,10 +36,15 @@ def load_etoro_config(env: dict[str, str] | None = None, min_order_usd: float = 
         env = dict(os.environ)
 
     mode = env.get("ETORO_MODE", "demo").lower()
-    api_key = env.get("ETORO_API_KEY", "")
-    user_key = env.get("ETORO_USER_KEY", "")
+    key_prefix = "ETORO_LIVE" if mode == "real" else "ETORO"
+    api_key = env.get(f"{key_prefix}_API_KEY", "")
+    user_key = env.get(f"{key_prefix}_USER_KEY", "")
 
-    missing = [name for name, val in [("ETORO_API_KEY", api_key), ("ETORO_USER_KEY", user_key)] if not val]
+    missing = [
+        name
+        for name, val in [(f"{key_prefix}_API_KEY", api_key), (f"{key_prefix}_USER_KEY", user_key)]
+        if not val
+    ]
     if missing:
         raise SystemExit(f"Missing required environment variables: {', '.join(missing)}")
 
