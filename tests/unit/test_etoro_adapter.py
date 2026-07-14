@@ -183,9 +183,34 @@ class TestEToroClientRequestBuilding:
         call_args = session.post.call_args
         url = call_args[0][0]
         body = call_args[1]["json"]
-        assert "market-close-orders/positions/1001" in url
+        assert "/trading/execution/demo/market-close-orders/positions/1001" in url
         assert body["InstrumentID"] == 201
         assert body["UnitsToDeduct"] == pytest.approx(2.5)
+
+    def test_real_mode_execution_urls_have_no_environment_segment(self):
+        session = MagicMock()
+        session.post.return_value = FakeResponse({"orderId": 999, "orderForClose": {}})
+
+        client = EToroClient(session=session, api_key="k", user_key="u", mode="real")
+        client.create_order(instrument_id=201, action="open", transaction="buy", amount_usd=500.0)
+        client.close_position(position_id=1001, instrument_id=201, units_to_deduct=2.5)
+
+        order_url = session.post.call_args_list[0][0][0]
+        close_url = session.post.call_args_list[1][0][0]
+        assert "/trading/execution/orders" in order_url
+        assert "/real/" not in order_url
+        assert "/trading/execution/market-close-orders/positions/1001" in close_url
+        assert "/real/" not in close_url
+
+    def test_real_mode_portfolio_url_keeps_environment_segment(self):
+        session = MagicMock()
+        session.get.return_value = FakeResponse(DEMO_PORTFOLIO_RESPONSE)
+
+        client = EToroClient(session=session, api_key="k", user_key="u", mode="real")
+        client.get_portfolio()
+
+        url = session.get.call_args[0][0]
+        assert "/trading/info/real/pnl" in url
 
 
 class TestEToroPortfolioBrokerAdapter:

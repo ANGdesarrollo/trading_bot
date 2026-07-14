@@ -37,6 +37,10 @@ class EToroClient:
         self._api_key = api_key
         self._user_key = user_key
         self._env = "demo" if mode == "demo" else "real"
+        # eToro execution endpoints are asymmetric: demo paths include a
+        # "demo/" segment, real paths have no environment segment at all.
+        # Info endpoints (e.g. /trading/info/{env}/pnl) use demo|real as-is.
+        self._execution_env_segment = "demo/" if self._env == "demo" else ""
 
     def _v1(self, path: str) -> str:
         return f"{_BASE_URL}/api/v1/{path.lstrip('/')}"
@@ -91,7 +95,7 @@ class EToroClient:
         transaction: str,
         amount_usd: float,
     ) -> dict:
-        url = self._v2(f"trading/execution/{self._env}/orders")
+        url = self._v2(f"trading/execution/{self._execution_env_segment}orders")
         body = {
             "action": action,
             "transaction": transaction,
@@ -110,7 +114,8 @@ class EToroClient:
         units_to_deduct: float | None = None,
     ) -> dict:
         url = self._v1(
-            f"trading/execution/{self._env}/market-close-orders/positions/{position_id}"
+            f"trading/execution/{self._execution_env_segment}"
+            f"market-close-orders/positions/{position_id}"
         )
         body: dict = {"InstrumentID": instrument_id}
         if units_to_deduct is not None:
